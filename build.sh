@@ -125,6 +125,7 @@ while [ $# -gt 0 ]; do
         --system-nspr) set_nspr_path "/usr/include/nspr/:"; no_local_nspr=1 ;;
         --system-sqlite) gyp_params+=(-Duse_system_sqlite=1) ;;
         --enable-fips) gyp_params+=(-Ddisable_fips=0) ;;
+        --enable-gost) gyp_params+=(-Ddisable_gost=0) ;;
         --fips-module-id) gyp_params+=(-Dfips_module_id="$2"); shift ;;
         --fips-module-id=?*) gyp_params+=(-Dfips_module_id="${1#*=}") ;;
         --enable-libpkix) gyp_params+=(-Ddisable_libpkix=0) ;;
