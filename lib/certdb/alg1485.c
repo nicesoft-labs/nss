@@ -89,6 +89,14 @@ static const NameToKind name2kinds[] = {
 /* values defined in X.520 */
     { "name",           64, SEC_OID_AVA_NAME,           SEC_ASN1_DS},
 
+#ifdef NSS_ENABLE_GOST
+    { "gostr3410",           64, SEC_OID_GOSTR3410, SEC_ASN1_DS},
+    { "gostr3410Signature",  64, SEC_OID_GOSTR3410_SIGNATURE, SEC_ASN1_DS},
+    { "gostr3411",           64, SEC_OID_GOSTR3411, SEC_ASN1_DS},
+    { "gostr3411HMAC",       64, SEC_OID_GOSTR3411_HMAC, SEC_ASN1_DS},
+    { "gost28147",           64, SEC_OID_GOST28147, SEC_ASN1_DS},
+#endif /* NSS_ENABLE_GOST */
+
     { 0,               256, SEC_OID_UNKNOWN,            0},
 };
 
