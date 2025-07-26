@@ -26,6 +26,7 @@
             'lib/crmf/exports.gyp:lib_crmf_exports',
             'lib/cryptohi/exports.gyp:lib_cryptohi_exports',
             'lib/dev/exports.gyp:lib_dev_exports',
+            'lib/gost/exports.gyp:lib_gost_exports',
             'lib/freebl/exports.gyp:lib_freebl_exports',
             'lib/jar/exports.gyp:lib_jar_exports',
             'lib/nss/exports.gyp:lib_nss_exports',
