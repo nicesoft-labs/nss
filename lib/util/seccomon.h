@@ -26,6 +26,9 @@
 
 #include "secport.h"
 
+/* Convert bit length to octet length */
+#define BITLEN_TO_OCTETLEN(bitLen) (((bitLen) + 7) >> 3)
+
 typedef enum {
     siBuffer = 0,
     siClearDataBuffer = 1,

@@ -121,9 +121,9 @@ struct DERTemplateStr {
 ** Macro to convert der decoded bit string into a decoded octet
 ** string. All it needs to do is fiddle with the length code.
 */
-#define DER_ConvertBitString(item)            \
-    {                                         \
-        (item)->len = ((item)->len + 7) >> 3; \
+#define DER_ConvertBitString(item)                     \
+    {                                                  \
+        (item)->len = BITLEN_TO_OCTETLEN((item)->len); \
     }
 
 #endif /* _SECDERT_H_ */
