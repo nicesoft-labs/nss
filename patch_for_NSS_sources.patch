@@ -1,0 +1,5388 @@
+diff --git a/security/nss/lib/certdb/certdb.c b/security/nss/lib/certdb/certdb.c
+--- a/security/nss/lib/certdb/certdb.c
++++ b/security/nss/lib/certdb/certdb.c
+@@ -1347,16 +1347,20 @@ CERT_CheckKeyUsage(CERTCertificate *cert
+ 	case dhKey:
+ 	    requiredUsage |= KU_KEY_AGREEMENT;
+ 	    break;
+ 	case ecKey:
+ 	    /* Accept either signature or agreement. */
+ 	    if (!(cert->keyUsage & (KU_DIGITAL_SIGNATURE | KU_KEY_AGREEMENT)))
+ 		 goto loser;
+ 	    break;
++	case gostR3410Key:
++	    if (!(cert->keyUsage & (KU_KEY_ENCIPHERMENT | KU_KEY_AGREEMENT)))
++		 goto loser;
++	    break;
+ 	default:
+ 	    goto loser;
+ 	}
+     }
+ 
+     certKeyUsage = cert->keyUsage;
+     if (certKeyUsage & KU_NON_REPUDIATION)
+         certKeyUsage |= KU_DIGITAL_SIGNATURE;
+diff --git a/security/nss/lib/cryptohi/keyhi.h b/security/nss/lib/cryptohi/keyhi.h
+--- a/security/nss/lib/cryptohi/keyhi.h
++++ b/security/nss/lib/cryptohi/keyhi.h
+@@ -123,16 +123,22 @@ SECKEYPrivateKey *SECKEY_CreateDHPrivate
+ 
+ /*
+  * create a new EC key pair. The private Key is returned...
+  */
+ SECKEYPrivateKey *SECKEY_CreateECPrivateKey(SECKEYECParams *param,
+                                            SECKEYPublicKey **pubk, void *cx);
+ 
+ /*
++ * create a new GOSTR3410 key pair. The private Key is returned...
++ */
++SECKEYPrivateKey *SECKEY_CreateGOSTR3410PrivateKey(SECKEYGOSTR3410Params *param,
++                                           SECKEYPublicKey **pubk, void *cx);
++
++/*
+ ** Create a subject-public-key-info based on a public key.
+ */
+ extern CERTSubjectPublicKeyInfo *
+ SECKEY_CreateSubjectPublicKeyInfo(SECKEYPublicKey *k);
+ 
+ /*
+ ** Decode a DER encoded public key into an SECKEYPublicKey structure.
+ */
+diff --git a/security/nss/lib/cryptohi/keythi.h b/security/nss/lib/cryptohi/keythi.h
+--- a/security/nss/lib/cryptohi/keythi.h
++++ b/security/nss/lib/cryptohi/keythi.h
+@@ -60,34 +60,38 @@ typedef enum {
+     nullKey = 0, 
+     rsaKey = 1, 
+     dsaKey = 2, 
+     fortezzaKey = 3,
+     dhKey = 4, 
+     keaKey = 5,
+     ecKey = 6,
+     rsaPssKey = 7,
+-    rsaOaepKey = 8
++    rsaOaepKey = 8,
++    gostR3410Key = 9
+ } KeyType;
+ 
+ /*
+ ** Template Definitions
+ **/
+ 
+ SEC_BEGIN_PROTOS
+ extern const SEC_ASN1Template SECKEY_RSAPublicKeyTemplate[];
+ extern const SEC_ASN1Template SECKEY_DSAPublicKeyTemplate[];
+ extern const SEC_ASN1Template SECKEY_DHPublicKeyTemplate[];
+ extern const SEC_ASN1Template SECKEY_DHParamKeyTemplate[];
+ extern const SEC_ASN1Template SECKEY_PQGParamsTemplate[];
+ extern const SEC_ASN1Template SECKEY_DSAPrivateKeyExportTemplate[];
++extern const SEC_ASN1Template SECKEY_GOSTR3410PublicKeyTemplate[];
++extern const SEC_ASN1Template SECKEY_GOSTR3410ParamKeyTemplate[];
+ 
+ /* Windows DLL accessor functions */
+ extern SEC_ASN1TemplateChooser NSS_Get_SECKEY_DSAPublicKeyTemplate;
+ extern SEC_ASN1TemplateChooser NSS_Get_SECKEY_RSAPublicKeyTemplate;
++extern SEC_ASN1TemplateChooser NSS_Get_SECKEY_GOSTR3410PublicKeyTemplate;
+ SEC_END_PROTOS
+ 
+ 
+ /*
+ ** RSA Public Key structures
+ ** member names from PKCS#1, section 7.1 
+ */
+ 
+@@ -197,30 +201,48 @@ typedef struct SECKEYKEAParamsStr SECKEY
+  
+ struct SECKEYKEAPublicKeyStr {
+     SECKEYKEAParams params;
+     SECItem publicValue;
+ };
+ typedef struct SECKEYKEAPublicKeyStr SECKEYKEAPublicKey;
+ 
+ /*
++** GOST R34.10-2001 Public Key structure
++*/
++struct SECKEYGOSTR3410ParamsStr {
++    PLArenaPool *arena;
++    SECItem gostR3410Params;
++    SECItem gostR3411Params;
++    SECItem gost28147Params;
++};
++typedef struct SECKEYGOSTR3410ParamsStr SECKEYGOSTR3410Params;
++
++struct SECKEYGOSTR3410PublicKeyStr {
++    SECItem publicValue;
++    SECKEYGOSTR3410Params params;
++};
++typedef struct SECKEYGOSTR3410PublicKeyStr SECKEYGOSTR3410PublicKey;
++
++/*
+ ** A Generic  public key object.
+ */
+ struct SECKEYPublicKeyStr {
+     PLArenaPool *arena;
+     KeyType keyType;
+     PK11SlotInfo *pkcs11Slot;
+     CK_OBJECT_HANDLE pkcs11ID;
+     union {
+         SECKEYRSAPublicKey rsa;
+ 	SECKEYDSAPublicKey dsa;
+ 	SECKEYDHPublicKey  dh;
+         SECKEYKEAPublicKey kea;
+         SECKEYFortezzaPublicKey fortezza;
+ 	SECKEYECPublicKey  ec;
++	SECKEYGOSTR3410PublicKey  gostR3410;
+     } u;
+ };
+ typedef struct SECKEYPublicKeyStr SECKEYPublicKey;
+ 
+ /* bit flag definitions for staticflags */
+ #define SECKEY_Attributes_Cached 0x1    /* bit 0 states
+                                            whether attributes are cached */
+ #define SECKEY_CKA_PRIVATE (1U << 1)    /* bit 1 is the value of CKA_PRIVATE */
+diff --git a/security/nss/lib/cryptohi/seckey.c b/security/nss/lib/cryptohi/seckey.c
+--- a/security/nss/lib/cryptohi/seckey.c
++++ b/security/nss/lib/cryptohi/seckey.c
+@@ -141,16 +141,31 @@ const SEC_ASN1Template SECKEY_KEAPublicK
+     { 0, }
+ };
+ 
+ const SEC_ASN1Template SECKEY_KEAParamsTemplate[] = {
+     { SEC_ASN1_OCTET_STRING, offsetof(SECKEYPublicKey,u.kea.params.hash), }, 
+     { 0, }
+ };
+ 
++const SEC_ASN1Template SECKEY_GOSTR3410PublicKeyTemplate[] = {
++    { SEC_ASN1_OCTET_STRING, offsetof(SECKEYPublicKey,u.gostR3410.publicValue), },
++    { 0, }
++};
++
++const SEC_ASN1Template SECKEY_GOSTR3410ParamKeyTemplate[] = {
++    { SEC_ASN1_SEQUENCE,  0, NULL, sizeof(SECKEYGOSTR3410Params) },
++    /* next three are OIDs, but they are more useable in encoded form */
++    { SEC_ASN1_ANY, offsetof(SECKEYGOSTR3410Params,gostR3410Params), },
++    { SEC_ASN1_ANY, offsetof(SECKEYGOSTR3410Params,gostR3411Params), },
++    { SEC_ASN1_ANY|SEC_ASN1_OPTIONAL, offsetof(SECKEYGOSTR3410Params,gost28147Params), },
++    { 0, }
++};
++
++SEC_ASN1_CHOOSER_IMPLEMENT(SECKEY_GOSTR3410PublicKeyTemplate)
+ SEC_ASN1_CHOOSER_IMPLEMENT(SECKEY_DSAPublicKeyTemplate)
+ SEC_ASN1_CHOOSER_IMPLEMENT(SECKEY_RSAPublicKeyTemplate)
+ SEC_ASN1_CHOOSER_IMPLEMENT(CERT_SubjectPublicKeyInfoTemplate)
+ 
+ /*
+  * See bugzilla bug 125359
+  * Since NSS (via PKCS#11) wants to handle big integers as unsigned ints,
+  * all of the templates above that en/decode into integers must be converted
+@@ -279,16 +294,53 @@ SECKEY_CreateECPrivateKey(SECKEYECParams
+                         PK11_ATTR_SESSION | PK11_ATTR_SENSITIVE | 
+                         PK11_ATTR_PRIVATE,
+                         CKF_DERIVE, CKF_DERIVE|CKF_SIGN,cx);
+ 
+     PK11_FreeSlot(slot);
+     return(privk);
+ }
+ 
++/* Create a GOST R34.10-2001 key pair in any slot able to do so, 
++** This is a "session" (temporary), not "token" (permanent) key. 
++** Because of the high probability that this key will need to be moved to
++** another token, and the high cost of moving "sensitive" keys, we attempt
++** to create this key pair without the "sensitive" attribute, but revert to 
++** creating a "sensitive" key if necessary.
++*/
++SECKEYPrivateKey *
++SECKEY_CreateGOSTR3410PrivateKey(SECKEYGOSTR3410Params *param,
++        SECKEYPublicKey **pubk, void *cx)
++{
++    SECKEYPrivateKey *privk;
++    PK11SlotInfo *slot = PK11_GetBestSlot(CKM_GOSTR3410_KEY_PAIR_GEN,cx);
++    if (!slot) {
++	return NULL;
++    }
++
++    privk = PK11_GenerateKeyPairWithOpFlags(slot,
++                        CKM_GOSTR3410_KEY_PAIR_GEN,
++                        param, pubk,
++                        PK11_ATTR_SESSION | PK11_ATTR_INSENSITIVE | 
++                        PK11_ATTR_PUBLIC,
++                        CKF_UNWRAP | CKF_DERIVE,
++                        CKF_UNWRAP | CKF_DERIVE | CKF_SIGN, cx);
++    if (!privk) 
++        privk = PK11_GenerateKeyPairWithOpFlags(slot,
++                            CKM_GOSTR3410_KEY_PAIR_GEN,
++                            param, pubk,
++                            PK11_ATTR_SESSION | PK11_ATTR_SENSITIVE | 
++                            PK11_ATTR_PRIVATE,
++                            CKF_UNWRAP | CKF_DERIVE,
++                            CKF_UNWRAP | CKF_DERIVE | CKF_SIGN, cx);
++
++    PK11_FreeSlot(slot);
++    return(privk);
++}
++
+ void
+ SECKEY_DestroyPrivateKey(SECKEYPrivateKey *privk)
+ {
+     if (privk) {
+ 	if (privk->pkcs11Slot) {
+ 	    if (privk->pkcs11IsTemp) {
+ 	    	PK11_DestroyObject(privk->pkcs11Slot,privk->pkcs11ID);
+ 	    }
+@@ -995,16 +1047,19 @@ seckey_GetKeyType (SECOidTag tag) {
+ 	keyType = keaKey;
+ 	break;
+       case SEC_OID_X942_DIFFIE_HELMAN_KEY:
+ 	keyType = dhKey;
+ 	break;
+       case SEC_OID_ANSIX962_EC_PUBLIC_KEY:
+ 	keyType = ecKey;
+ 	break;
++      case SEC_OID_GOSTR3410:
++	keyType = gostR3410Key;
++	break;
+       default:
+ 	keyType = nullKey;
+     }
+     return keyType;
+ }
+ 
+ /* Function used to determine what kind of cert we are dealing with. */
+ KeyType 
+@@ -1148,16 +1203,39 @@ seckey_ExtractPublicKey(CERTSubjectPubli
+         rv = SECITEM_CopyItem(arena, &pubk->u.ec.DEREncodedParams, 
+ 	    &spki->algorithm.parameters);
+         if ( rv != SECSuccess )
+             break;
+         rv = SECITEM_CopyItem(arena, &pubk->u.ec.publicValue, &newOs);
+ 	if (rv == SECSuccess) return pubk;
+ 	break;
+ 
++      case SEC_OID_GOSTR3410:
++	pubk->keyType = gostR3410Key;
++	rv = SEC_QuickDERDecodeItem(arena, pubk,
++	        SECKEY_GOSTR3410PublicKeyTemplate, &newOs);
++	if (rv != SECSuccess) break;
++	rv = SECITEM_CopyItem(arena, &newParms, &spki->algorithm.parameters);
++	if (rv != SECSuccess) break;
++	rv = SEC_QuickDERDecodeItem(arena, &pubk->u.gostR3410.params,
++	        SECKEY_GOSTR3410ParamKeyTemplate, &newParms);
++	/* check if decoded params are OIDs */
++	if (!pubk->u.gostR3410.params.gostR3410Params.len ||
++		pubk->u.gostR3410.params.gostR3410Params.data[0] !=
++		        SEC_ASN1_OBJECT_ID ||
++		!pubk->u.gostR3410.params.gostR3411Params.len ||
++		pubk->u.gostR3410.params.gostR3411Params.data[0] !=
++		        SEC_ASN1_OBJECT_ID ||
++		(pubk->u.gostR3410.params.gost28147Params.len &&
++		pubk->u.gostR3410.params.gost28147Params.data[0] !=
++		        SEC_ASN1_OBJECT_ID))
++	    rv = SECFailure;
++	if (rv == SECSuccess) return pubk;
++	break;
++
+       default:
+ 	rv = SECFailure;
+ 	break;
+     }
+ 
+     SECKEY_DestroyPublicKey (pubk);
+     return NULL;
+ }
+@@ -1500,16 +1578,18 @@ SECKEY_PublicKeyStrength(const SECKEYPub
+     	return b0 ? pubk->u.dh.publicValue.len :
+ 	    pubk->u.dh.publicValue.len - 1;
+     case fortezzaKey:
+ 	return PR_MAX(pubk->u.fortezza.KEAKey.len, pubk->u.fortezza.DSSKey.len);
+     case ecKey:
+ 	/* Get the key size in bits and adjust */
+ 	size =	SECKEY_ECParamsToKeySize(&pubk->u.ec.DEREncodedParams);
+ 	return (size + 7)/8;
++    case gostR3410Key:
++	return 64;
+     default:
+ 	break;
+     }
+ loser:
+     PORT_SetError(SEC_ERROR_INVALID_KEY);
+     return 0;
+ }
+ 
+@@ -1518,16 +1598,17 @@ unsigned
+ SECKEY_PublicKeyStrengthInBits(const SECKEYPublicKey *pubk)
+ {
+     unsigned size;
+     switch (pubk->keyType) {
+     case rsaKey:
+     case dsaKey:
+     case dhKey:
+     case fortezzaKey:
++    case gostR3410Key:
+ 	return SECKEY_PublicKeyStrength(pubk) * 8; /* 1 byte = 8 bits */
+     case ecKey:
+ 	size = SECKEY_ECParamsToKeySize(&pubk->u.ec.DEREncodedParams);
+ 	return size;
+     default:
+ 	break;
+     }
+     PORT_SetError(SEC_ERROR_INVALID_KEY);
+@@ -1548,16 +1629,18 @@ SECKEY_SignatureLen(const SECKEYPublicKe
+     case fortezzaKey:
+     case dsaKey:
+     	return DSA_SIGNATURE_LEN;
+     case ecKey:
+ 	/* Get the base point order length in bits and adjust */
+ 	size =	SECKEY_ECParamsToBasePointOrderLen(
+ 		&pubk->u.ec.DEREncodedParams);
+ 	return ((size + 7)/8) * 2;
++    case gostR3410Key:
++       return 64;
+     default:
+ 	break;
+     }
+     PORT_SetError(SEC_ERROR_INVALID_KEY);
+     return 0;
+ }
+ 
+ SECKEYPrivateKey *
+@@ -1716,16 +1799,33 @@ SECKEY_CopyPublicKey(const SECKEYPublicK
+       case ecKey:
+           copyk->u.ec.size = pubk->u.ec.size;
+           rv = SECITEM_CopyItem(arena,&copyk->u.ec.DEREncodedParams,
+                                 &pubk->u.ec.DEREncodedParams);
+           if (rv != SECSuccess) break;
+           rv = SECITEM_CopyItem(arena,&copyk->u.ec.publicValue,
+                                 &pubk->u.ec.publicValue);
+           break;
++      case gostR3410Key:
++          rv = SECITEM_CopyItem(arena,
++                                &copyk->u.gostR3410.publicValue,
++                                &pubk->u.gostR3410.publicValue);
++          if (rv != SECSuccess) break;
++          rv = SECITEM_CopyItem(arena,
++                                &copyk->u.gostR3410.params.gostR3410Params,
++                                &pubk->u.gostR3410.params.gostR3410Params);
++          if (rv != SECSuccess) break;
++          rv = SECITEM_CopyItem(arena,
++                                &copyk->u.gostR3410.params.gostR3411Params,
++                                &pubk->u.gostR3410.params.gostR3411Params);
++          if (rv != SECSuccess) break;
++          rv = SECITEM_CopyItem(arena,
++                                &copyk->u.gostR3410.params.gost28147Params,
++                                &pubk->u.gostR3410.params.gost28147Params);
++          break;
+       case nullKey:
+           return copyk;
+       default:
+           rv = SECFailure;
+           break;
+     }
+     if (rv == SECSuccess)
+         return copyk;
+@@ -1774,16 +1874,17 @@ SECKEY_ConvertToPublicKey(SECKEYPrivateK
+      * fortezza is at the head of this switch, since we don't want to
+      * allocate an arena... CERT_ExtractPublicKey will to that for us.
+      */
+     switch(privk->keyType) {
+       case fortezzaKey:
+       case nullKey:
+       case dhKey:
+       case dsaKey:
++      case gostR3410Key:
+ 	/* Nothing to query, if the cert isn't there, we're done -- no way
+ 	 * to get the public key */
+ 	break;
+       case rsaKey:
+ 	rv = PK11_ReadAttribute(privk->pkcs11Slot,privk->pkcs11ID,
+ 				CKA_MODULUS,arena,&pubk->u.rsa.modulus);
+ 	if (rv != SECSuccess)  break;
+ 	rv = PK11_ReadAttribute(privk->pkcs11Slot,privk->pkcs11ID,
+@@ -1934,16 +2035,36 @@ SECKEY_CreateSubjectPublicKeyInfo(SECKEY
+ 		    /*
+ 		     * We got a good one; return it.
+ 		     */
+ 		    return spki;
+ 		}
+ 	    }
+ #endif
+ 	    break;
++	  case gostR3410Key:
++	    /* DER encode the params. */
++	    rv_item = SEC_ASN1EncodeItem(arena, &params,
++				 &pubk->u.gostR3410.params,
++				 SECKEY_GOSTR3410ParamKeyTemplate);
++	    if (rv_item) {
++		rv = SECOID_SetAlgorithmID(arena, &spki->algorithm,
++				     SEC_OID_GOSTR3410, &params);
++		if (rv == SECSuccess) {
++		    rv_item = SEC_ASN1EncodeItem(arena,
++				         &spki->subjectPublicKey, pubk,
++					 SECKEY_GOSTR3410PublicKeyTemplate);
++		    if (rv_item) {
++			spki->subjectPublicKey.len <<= 3;
++			return spki;
++		    }
++		}
++	    }
++	    SECITEM_FreeItem(&params, PR_FALSE);
++	    break;
+ 	  default:
+ 	    break;
+ 	}
+     } else {
+ 	PORT_SetError(SEC_ERROR_NO_MEMORY);
+     }
+ 
+     PORT_FreeArena(arena, PR_FALSE);
+@@ -2357,16 +2478,21 @@ SECKEY_ImportDERPublicKey(SECItem *derKe
+         rv = SEC_QuickDERDecodeItem(pubk->arena, pubk, SECKEY_DSAPublicKeyTemplate, &newDerKey);
+         pubk->keyType = dsaKey;
+         break;
+       case CKK_DH:
+ 	prepare_dh_pub_key_for_asn1(pubk);
+         rv = SEC_QuickDERDecodeItem(pubk->arena, pubk, SECKEY_DHPublicKeyTemplate, &newDerKey);
+         pubk->keyType = dhKey;
+         break;
++      case CKK_GOSTR3410:
++        rv = SEC_QuickDERDecodeItem(pubk->arena, pubk,
++	        SECKEY_GOSTR3410PublicKeyTemplate, &newDerKey);
++        pubk->keyType = gostR3410Key;
++        break;
+       default:
+         rv = SECFailure;
+         break;
+     }
+ 
+ finish:
+     if( rv != SECSuccess && pubk != NULL) {
+         if (pubk->arena) {
+diff --git a/security/nss/lib/cryptohi/secsign.c b/security/nss/lib/cryptohi/secsign.c
+--- a/security/nss/lib/cryptohi/secsign.c
++++ b/security/nss/lib/cryptohi/secsign.c
+@@ -359,16 +359,19 @@ SEC_DerSignData(PRArenaPool *arena, SECI
+ 	    algID = SEC_OID_PKCS1_SHA1_WITH_RSA_ENCRYPTION;
+ 	    break;
+ 	  case dsaKey:
+ 	    algID = SEC_OID_ANSIX9_DSA_SIGNATURE_WITH_SHA1_DIGEST;
+ 	    break;
+ 	  case ecKey:
+ 	    algID = SEC_OID_ANSIX962_ECDSA_SIGNATURE_WITH_SHA1_DIGEST;
+ 	    break;
++	  case gostR3410Key:
++	    algID = SEC_OID_GOSTR3410_SIGNATURE;
++	    break;
+ 	  default:
+ 	    PORT_SetError(SEC_ERROR_INVALID_KEY);
+ 	    return SECFailure;
+ 	}
+     }
+ 
+     /* Sign input buffer */
+     rv = SEC_SignData(&it, buf, len, pk, algID);
+@@ -506,13 +509,23 @@ SEC_GetSignatureAlgorithmOidTag(KeyType 
+             sigTag = SEC_OID_ANSIX962_ECDSA_SHA256_SIGNATURE; break;
+ 	case SEC_OID_SHA384:
+             sigTag = SEC_OID_ANSIX962_ECDSA_SHA384_SIGNATURE; break;
+ 	case SEC_OID_SHA512:
+             sigTag = SEC_OID_ANSIX962_ECDSA_SHA512_SIGNATURE; break;
+ 	default:
+ 	break;
+ 	}
++	break;
++    case gostR3410Key:
++	switch (hashAlgTag) {
++	case SEC_OID_UNKNOWN:	/* default for GOSTR3410 if not specified */
++	case SEC_OID_GOSTR3411:
++            sigTag = SEC_OID_GOSTR3410_SIGNATURE; break;
++	default:
++	break;
++	}
++	break;
+     default:
+     	break;
+     }
+     return sigTag;
+ }
+diff --git a/security/nss/lib/cryptohi/secvfy.c b/security/nss/lib/cryptohi/secvfy.c
+--- a/security/nss/lib/cryptohi/secvfy.c
++++ b/security/nss/lib/cryptohi/secvfy.c
+@@ -134,16 +134,18 @@ struct VFYContextStr {
+ 	unsigned char buffer[1];
+ 
+ 	/* the digest in the decrypted RSA signature */
+ 	unsigned char rsadigest[HASH_LENGTH_MAX];
+ 	/* the full DSA signature... 40 bytes */
+ 	unsigned char dsasig[DSA_SIGNATURE_LEN];
+ 	/* the full ECDSA signature */
+ 	unsigned char ecdsasig[2 * MAX_ECKEY_LEN];
++	/* the full GOST R34.10-2001 signature */
++	unsigned char gostR3410sig[64];
+     } u;
+     unsigned int rsadigestlen;
+     void * wincx;
+     void *hashcx;
+     const SECHashObject *hashobj;
+     SECOidTag encAlg;  /* enc alg */
+     PRBool hasSignature;  /* true if the signature was provided in the
+                            * VFY_CreateContext call.  If false, the
+@@ -304,16 +306,19 @@ sec_DecodeSigAlg(const SECKEYPublicKey *
+ 	}
+ 	*hashalg = SECOID_FindOIDTag(&oid);
+ 	/* only accept hash algorithms */
+ 	if (HASH_GetHashTypeByOidTag(*hashalg) == HASH_AlgNULL) {
+ 	    /* error set by HASH_GetHashTypeByOidTag */
+ 	    return SECFailure;
+ 	}
+ 	break;
++      case SEC_OID_GOSTR3410_SIGNATURE:
++	*hashalg = SEC_OID_GOSTR3411;
++	break;
+       /* we don't implement MD4 hashes */
+       case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
+       default:
+ 	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+ 	return SECFailure;
+     }
+     /* get the "encryption" algorithm */ 
+     switch (sigAlg) {
+@@ -346,16 +351,19 @@ sec_DecodeSigAlg(const SECKEYPublicKey *
+       case SEC_OID_ANSIX962_ECDSA_SHA1_SIGNATURE:
+       case SEC_OID_ANSIX962_ECDSA_SHA256_SIGNATURE:
+       case SEC_OID_ANSIX962_ECDSA_SHA384_SIGNATURE:
+       case SEC_OID_ANSIX962_ECDSA_SHA512_SIGNATURE:
+       case SEC_OID_ANSIX962_ECDSA_SIGNATURE_RECOMMENDED_DIGEST:
+       case SEC_OID_ANSIX962_ECDSA_SIGNATURE_SPECIFIED_DIGEST:
+ 	*encalg = SEC_OID_ANSIX962_EC_PUBLIC_KEY;
+ 	break;
++      case SEC_OID_GOSTR3410_SIGNATURE:
++	*encalg = SEC_OID_GOSTR3410;
++	break;
+       /* we don't implement MD4 hashes */
+       case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
+       default:
+ 	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+ 	return SECFailure;
+     }
+     return SECSuccess;
+ }
+@@ -416,16 +424,24 @@ vfy_CreateContext(const SECKEYPublicKey 
+ 	    sigLen = SECKEY_SignatureLen(key);
+ 	    if (sigLen == 0) {
+ 		/* error set by SECKEY_SignatureLen */
+ 		rv = SECFailure;	
+ 		break;
+ 	    }
+ 	    rv = decodeECorDSASignature(encAlg, sig, cx->u.buffer, sigLen);
+  	    break;
++	case gostR3410Key:
++	    if (sig->len != 64) {
++		PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
++		rv = SECFailure;	
++		break;
++	    }
++ 	    PORT_Memcpy(cx->u.buffer, sig->data, sig->len);
++ 	    break;
+ 	default:
+ 	    rv = SECFailure;
+ 	    PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+ 	    break;
+ 	}
+     }
+ 
+     if (rv) goto loser;
+@@ -582,16 +598,33 @@ VFY_EndWithSignature(VFYContext *cx, SEC
+ 	    }
+ 	}
+ 	if ((part != cx->rsadigestlen) ||
+ 	    PORT_Memcmp(final, cx->u.buffer, part)) {
+ 	    PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+ 	    return SECFailure;
+ 	}
+ 	break;
++      case gostR3410Key:
++	dsasig.data = cx->u.buffer;
++	dsasig.len = 64;
++	if (sig) {
++	    if (sig->len != 64) {
++		PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
++		return SECFailure;
++	    }
++	    PORT_Memcpy(dsasig.data, sig->data, sig->len);
++	} 
++	hash.data = final;
++	hash.len = part;
++	if (PK11_Verify(cx->key,&dsasig,&hash,cx->wincx) != SECSuccess) {
++	    PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
++	    return SECFailure;
++	}
++	break;
+       default:
+ 	PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+ 	return SECFailure; /* shouldn't happen */
+     }
+     return SECSuccess;
+ }
+ 
+ SECStatus
+@@ -623,16 +656,17 @@ vfy_VerifyDigest(const SECItem *digest, 
+ 		PORT_Memcmp(digest->data, cx->u.buffer, digest->len)) {
+ 		PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+ 	    } else {
+ 		rv = SECSuccess;
+ 	    }
+ 	    break;
+ 	case dsaKey:
+ 	case ecKey:
++	case gostR3410Key:
+ 	    dsasig.data = cx->u.buffer;
+ 	    dsasig.len = SECKEY_SignatureLen(cx->key);
+ 	    if (dsasig.len == 0) {
+ 		break;
+ 	    }
+ 	    if (PK11_Verify(cx->key, &dsasig, (SECItem *)digest, cx->wincx)
+ 		!= SECSuccess) {
+ 		PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+diff --git a/security/nss/lib/nss/nss.def b/security/nss/lib/nss/nss.def
+--- a/security/nss/lib/nss/nss.def
++++ b/security/nss/lib/nss/nss.def
+@@ -1000,16 +1000,24 @@ CERT_DupDistNames;
+ ;+NSS_3.12.7 { 	# NSS 3.12.7 release
+ ;+    global:
+ CERT_GetConstrainedCertificateNames;
+ ;+    local:
+ ;+       *;
+ ;+};
+ ;+NSS_3.12.9 {  # NSS 3.12.9 release
+ ;+    global:
++;;SECKEY_GOSTR3410PublicKeyTemplate DATA ;
++NSS_Get_SECKEY_GOSTR3410PublicKeyTemplate;
++CERT_GetCertKeyType;
++HASH_GetHashOidTagByHashType;
++PK11_DecodeGOST28147AlgorithmIDParams;
++PK11_ImportSymKeyWithTemplate;
++PK11_PubUnwrapSymKeyWithTemplate;
++PK11_PubWrapSymKeyRaw;
+ CERT_FindCertByNicknameOrEmailAddrForUsage;
+ PK11_DeriveWithTemplate;
+ PK11_FindCertsFromEmailAddress;
+ PK11_KeyGenWithTemplate;
+ SECMOD_RestartModules;
+ ;+    local:
+ ;+       *;
+ ;+};
+diff --git a/security/nss/lib/pk11wrap/debug_module.c b/security/nss/lib/pk11wrap/debug_module.c
+--- a/security/nss/lib/pk11wrap/debug_module.c
++++ b/security/nss/lib/pk11wrap/debug_module.c
+@@ -188,16 +188,19 @@ static void get_attr_type_str(CK_ATTRIBU
+     CASE(CKA_TRUST_IPSEC_END_SYSTEM);
+     CASE(CKA_TRUST_IPSEC_TUNNEL);
+     CASE(CKA_TRUST_IPSEC_USER);
+     CASE(CKA_TRUST_TIME_STAMPING);
+     CASE(CKA_CERT_SHA1_HASH);
+     CASE(CKA_CERT_MD5_HASH);
+     CASE(CKA_NETSCAPE_DB);
+     CASE(CKA_NETSCAPE_TRUST);
++    CASE(CKA_GOSTR3410PARAMS);
++    CASE(CKA_GOSTR3411PARAMS);
++    CASE(CKA_GOST28147PARAMS);
+     default: break;
+     }
+     if (a)
+ 	PR_snprintf(str, len, "%s", a);
+     else
+ 	PR_snprintf(str, len, "0x%p", atype);
+ }
+ 
+@@ -561,16 +564,28 @@ static void print_mechanism(CK_MECHANISM
+     CASE(CKM_TWOFISH_CBC);
+     CASE(CKM_TWOFISH_KEY_GEN);
+     CASE(CKM_X9_42_DH_DERIVE);
+     CASE(CKM_X9_42_DH_HYBRID_DERIVE);
+     CASE(CKM_X9_42_DH_KEY_PAIR_GEN);
+     CASE(CKM_X9_42_DH_PARAMETER_GEN);
+     CASE(CKM_X9_42_MQV_DERIVE);
+     CASE(CKM_XOR_BASE_AND_DATA);
++    CASE(CKM_GOSTR3410_KEY_PAIR_GEN);
++    CASE(CKM_GOSTR3410);
++    CASE(CKM_GOSTR3410_WITH_GOSTR3411);
++    CASE(CKM_GOSTR3410_KEY_WRAP);
++    CASE(CKM_GOSTR3410_DERIVE);
++    CASE(CKM_GOSTR3411);
++    CASE(CKM_GOSTR3411_HMAC);
++    CASE(CKM_GOST28147_KEY_GEN);
++    CASE(CKM_GOST28147_ECB);
++    CASE(CKM_GOST28147);
++    CASE(CKM_GOST28147_MAC);
++    CASE(CKM_GOST28147_KEY_WRAP);
+     default: break;
+     }
+     if (a)
+ 	PR_LOG(modlog, 4, ("      mechanism = %s", a));
+     else
+ 	PR_LOG(modlog, 4, ("      mechanism = 0x%p", m->mechanism));
+ }
+ 
+@@ -595,16 +610,19 @@ static void get_key_type(CK_KEY_TYPE key
+     CASE(CKK_KEA);
+     CASE(CKK_RC2);
+     CASE(CKK_RC4);
+     CASE(CKK_RC5);
+     CASE(CKK_RSA);
+     CASE(CKK_SKIPJACK);
+     CASE(CKK_TWOFISH);
+     CASE(CKK_X9_42_DH);
++    CASE(CKK_GOSTR3410);
++    CASE(CKK_GOSTR3411);
++    CASE(CKK_GOST28147);
+     default: break;
+     }
+     if (a)
+ 	PR_snprintf(str, len, "%s", a);
+     else
+ 	PR_snprintf(str, len, "0x%p", keyType);
+ }
+ 
+diff --git a/security/nss/lib/pk11wrap/pk11akey.c b/security/nss/lib/pk11wrap/pk11akey.c
+--- a/security/nss/lib/pk11wrap/pk11akey.c
++++ b/security/nss/lib/pk11wrap/pk11akey.c
+@@ -72,16 +72,19 @@ pk11_MakeIDFromPublicKey(SECKEYPublicKey
+       pubKeyIndex = &pubKey->u.dsa.publicValue;
+       break;
+     case dhKey:
+       pubKeyIndex = &pubKey->u.dh.publicValue;
+       break;      
+     case ecKey:
+       pubKeyIndex = &pubKey->u.ec.publicValue;
+       break;      
++    case gostR3410Key:
++      pubKeyIndex = &pubKey->u.gostR3410.publicValue;
++      break;      
+     default:
+       return NULL;
+     }
+     PORT_Assert(pubKeyIndex != NULL);
+ 
+     return PK11_MakeIDFromPubKey(pubKeyIndex);
+ } 
+ 
+@@ -217,16 +220,37 @@ PK11_ImportPublicKey(PK11SlotInfo *slot,
+ 			SECITEM_FreeItem(ckaId,PR_TRUE);
+ 		    }
+ 		    return CK_INVALID_HANDLE;
+ 		}
+ 	    	PK11_SETATTRS(attrs, CKA_EC_POINT, 
+ 			  pubValue->data, pubValue->len); attrs++;
+ 	    }
+ 	    break;
++        case gostR3410Key:
++	    keyType = CKK_GOSTR3410;
++	    PK11_SETATTRS(attrs, CKA_VERIFY, &cktrue, sizeof(CK_BBOOL));attrs++;
++	    PK11_SETATTRS(attrs, CKA_WRAP, &cktrue, sizeof(CK_BBOOL) ); attrs++;
++	    PK11_SETATTRS(attrs, CKA_DERIVE, &cktrue, sizeof(CK_BBOOL));attrs++;
++ 	    signedattr = attrs;
++	    PK11_SETATTRS(attrs, CKA_GOSTR3410PARAMS,
++		    pubKey->u.gostR3410.params.gostR3410Params.data,
++		    pubKey->u.gostR3410.params.gostR3410Params.len); attrs++;
++	    PK11_SETATTRS(attrs, CKA_GOSTR3411PARAMS,
++		    pubKey->u.gostR3410.params.gostR3411Params.data,
++		    pubKey->u.gostR3410.params.gostR3411Params.len); attrs++;
++	    if (pubKey->u.gostR3410.params.gost28147Params.len > 0) {
++	        PK11_SETATTRS(attrs, CKA_GOST28147PARAMS,
++		        pubKey->u.gostR3410.params.gost28147Params.data,
++		        pubKey->u.gostR3410.params.gost28147Params.len); attrs++;
++	    }
++	    PK11_SETATTRS(attrs, CKA_VALUE,
++	            pubKey->u.gostR3410.publicValue.data, 
++	            pubKey->u.gostR3410.publicValue.len); attrs++;
++	    break;
+ 	default:
+ 	    PORT_SetError( SEC_ERROR_BAD_KEY );
+ 	    return CK_INVALID_HANDLE;
+ 	}
+ 
+ 	templateCount = attrs - theTemplate;
+ 	signedcount = attrs - signedattr;
+ 	PORT_Assert(templateCount <= (sizeof(theTemplate)/sizeof(CK_ATTRIBUTE)));
+@@ -583,16 +607,17 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot
+     SECKEYPublicKey *pubKey;
+     int templateCount = 0;
+     CK_KEY_TYPE pk11KeyType;
+     CK_RV crv;
+     CK_ATTRIBUTE template[8];
+     CK_ATTRIBUTE *attrs= template;
+     CK_ATTRIBUTE *modulus,*exponent,*base,*prime,*subprime,*value;
+     CK_ATTRIBUTE *ecparams;
++    CK_ATTRIBUTE *gostR3410Params,*gostR3411Params, *gost28147Params;
+ 
+     /* if we didn't know the key type, get it */
+     if (keyType== nullKey) {
+ 
+         pk11KeyType = PK11_ReadULongAttribute(slot,id,CKA_KEY_TYPE);
+ 	if (pk11KeyType ==  CK_UNAVAILABLE_INFORMATION) {
+ 	    return NULL;
+ 	}
+@@ -604,16 +629,19 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot
+ 	    keyType = dsaKey;
+ 	    break;
+ 	case CKK_DH:
+ 	    keyType = dhKey;
+ 	    break;
+ 	case CKK_EC:
+ 	    keyType = ecKey;
+ 	    break;
++	case CKK_GOSTR3410:
++	    keyType = gostR3410Key;
++	    break;
+ 	default:
+ 	    PORT_SetError( SEC_ERROR_BAD_KEY );
+ 	    return NULL;
+ 	}
+     }
+ 
+ 
+     /* now we need to create space for the public key */
+@@ -731,16 +759,48 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot
+ 
+ 	crv = pk11_Attr2SecItem(arena,ecparams,
+ 	                        &pubKey->u.ec.DEREncodedParams);
+ 	if (crv != CKR_OK) break;
+ 	crv = pk11_get_Decoded_ECPoint(arena,
+ 		 &pubKey->u.ec.DEREncodedParams, value, 
+ 		 &pubKey->u.ec.publicValue);
+ 	break;
++    case gostR3410Key:
++	gostR3410Params = attrs;
++	PK11_SETATTRS(attrs, CKA_GOSTR3410PARAMS, NULL, 0); attrs++; 
++	gostR3411Params = attrs;
++	PK11_SETATTRS(attrs, CKA_GOSTR3411PARAMS, NULL, 0); attrs++; 
++	gost28147Params = attrs;
++	PK11_SETATTRS(attrs, CKA_GOST28147PARAMS, NULL, 0); attrs++; 
++	value = attrs;
++	PK11_SETATTRS(attrs, CKA_VALUE, NULL, 0); attrs++; 
++	templateCount = attrs - template;
++	PR_ASSERT(templateCount <= sizeof(template)/sizeof(CK_ATTRIBUTE));
++	crv = PK11_GetAttributes(tmp_arena,slot,id,template,templateCount);
++	if (crv != CKR_OK) break;
++
++	if ((keyClass != CKO_PUBLIC_KEY) || (pk11KeyType != CKK_GOSTR3410)) {
++	    crv = CKR_OBJECT_HANDLE_INVALID;
++	    break;
++	} 
++	crv = pk11_Attr2SecItem(arena, gostR3410Params,
++	        &pubKey->u.gostR3410.params.gostR3410Params);
++	if (crv != CKR_OK) break;
++	crv = pk11_Attr2SecItem(arena, gostR3411Params,
++	        &pubKey->u.gostR3410.params.gostR3411Params);
++	if (crv != CKR_OK) break;
++	if (gost28147Params->ulValueLen > 0) {
++	   crv = pk11_Attr2SecItem(arena, gost28147Params,
++	           &pubKey->u.gostR3410.params.gost28147Params);
++	   if (crv != CKR_OK) break;
++	}
++	crv = pk11_Attr2SecItem(arena, value, &pubKey->u.gostR3410.publicValue);
++	if (crv != CKR_OK) break;
++	break;
+     case fortezzaKey:
+     case nullKey:
+     default:
+ 	crv = CKR_OBJECT_HANDLE_INVALID;
+ 	break;
+     }
+ 
+     PORT_FreeArena(tmp_arena,PR_FALSE);
+@@ -774,16 +834,17 @@ PK11_MakePrivKey(PK11SlotInfo *slot, Key
+ 	pk11Type = PK11_ReadULongAttribute(slot,privID,CKA_KEY_TYPE);
+ 	isTemp = (PRBool)!PK11_HasAttributeSet(slot,privID,CKA_TOKEN);
+ 	switch (pk11Type) {
+ 	case CKK_RSA: keyType = rsaKey; break;
+ 	case CKK_DSA: keyType = dsaKey; break;
+ 	case CKK_DH: keyType = dhKey; break;
+ 	case CKK_KEA: keyType = fortezzaKey; break;
+ 	case CKK_EC: keyType = ecKey; break;
++	case CKK_GOSTR3410: keyType = gostR3410Key; break;
+ 	default:
+ 		break;
+ 	}
+     }
+ 
+     /* if the key is private, make sure we are authenticated to the
+      * token before we try to use it */
+     isPrivate = (PRBool)PK11_HasAttributeSet(slot,privID,CKA_PRIVATE);
+@@ -955,16 +1016,25 @@ pk11_loadPrivKeyWithFlags(PK11SlotInfo *
+ 	ap->type = CKA_DERIVE; ap++; count++; extra_count++;
+ 	break;
+     case ecKey:
+ 	ap->type = CKA_EC_PARAMS; ap++; count++; extra_count++;
+ 	ap->type = CKA_VALUE; ap++; count++; extra_count++;
+ 	ap->type = CKA_DERIVE; ap++; count++; extra_count++;
+ 	ap->type = CKA_SIGN; ap++; count++; extra_count++;
+ 	break;
++    case gostR3410Key:
++	ap->type = CKA_GOSTR3410PARAMS; ap++; count++; extra_count++;
++	ap->type = CKA_GOSTR3410PARAMS; ap++; count++; extra_count++;
++	ap->type = CKA_GOST28147PARAMS; ap++; count++; extra_count++;
++	ap->type = CKA_VALUE; ap++; count++; extra_count++;
++	ap->type = CKA_SIGN; ap++; count++; extra_count++;
++	ap->type = CKA_DERIVE; ap++; count++; extra_count++;
++	ap->type = CKA_UNWRAP; ap++; count++; extra_count++;
++	break;
+      default:
+ 	count = 0;
+ 	extra_count = 0;
+ 	break;
+      }
+ 
+      if (count == 0) {
+ 	PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+@@ -1111,25 +1181,38 @@ PK11_GenerateKeyPairWithOpFlags(PK11Slot
+       { CKA_TOKEN,  NULL, 0},
+       { CKA_DERIVE,  NULL, 0},
+       { CKA_WRAP,  NULL, 0},
+       { CKA_VERIFY,  NULL, 0},
+       { CKA_VERIFY_RECOVER,  NULL, 0},
+       { CKA_ENCRYPT,  NULL, 0},
+       { CKA_MODIFIABLE,  NULL, 0},
+     };
++    CK_ATTRIBUTE gostR3410PubTemplate[] = {
++	{ CKA_GOSTR3410PARAMS, NULL, 0 },
++	{ CKA_GOSTR3411PARAMS, NULL, 0 },
++	{ CKA_GOST28147PARAMS, NULL, 0 },
++	{ CKA_TOKEN,  NULL, 0},
++	{ CKA_DERIVE,  NULL, 0},
++	{ CKA_WRAP,  NULL, 0},
++	{ CKA_VERIFY,  NULL, 0},
++	{ CKA_VERIFY_RECOVER,  NULL, 0},
++	{ CKA_ENCRYPT,  NULL, 0},
++	{ CKA_MODIFIABLE,  NULL, 0},
++    };
+     SECKEYECParams * ecParams;
+ 
+     /*CK_ULONG key_size = 0;*/
+     CK_ATTRIBUTE *pubTemplate;
+     int privCount = 0;
+     int pubCount = 0;
+     PK11RSAGenParams *rsaParams;
+     SECKEYPQGParams *dsaParams;
+     SECKEYDHParams * dhParams;
++    SECKEYGOSTR3410Params *gostR3410Params;
+     CK_MECHANISM mechanism;
+     CK_MECHANISM test_mech;
+     CK_MECHANISM test_mech2;
+     CK_SESSION_HANDLE session_handle;
+     CK_RV crv;
+     CK_OBJECT_HANDLE privID,pubID;
+     SECKEYPrivateKey *privKey;
+     KeyType keyType;
+@@ -1311,16 +1394,34 @@ PK11_GenerateKeyPairWithOpFlags(PK11Slot
+ 	    /* just do ECDH */
+ 	    test_mech.mechanism = CKM_ECDH1_DERIVE;
+ 	} else {
+ 	    /* neither was specified default to both */
+ 	    test_mech.mechanism = CKM_ECDH1_DERIVE;
+ 	    test_mech2.mechanism = CKM_ECDSA;
+ 	}
+         break;
++    case CKM_GOSTR3410_KEY_PAIR_GEN:
++	gostR3410Params = (SECKEYGOSTR3410Params *)param;
++	attrs = gostR3410PubTemplate;
++	PK11_SETATTRS(attrs, CKA_GOSTR3410PARAMS,
++	        gostR3410Params->gostR3410Params.data,
++	        gostR3410Params->gostR3410Params.len); attrs++;
++	PK11_SETATTRS(attrs, CKA_GOSTR3411PARAMS,
++	        gostR3410Params->gostR3411Params.data,
++	        gostR3410Params->gostR3411Params.len); attrs++;
++	if (gostR3410Params->gost28147Params.len > 0) {
++	    PK11_SETATTRS(attrs, CKA_GOST28147PARAMS,
++	            gostR3410Params->gost28147Params.data,
++	            gostR3410Params->gost28147Params.len); attrs++;
++	}
++	pubTemplate = gostR3410PubTemplate;
++	keyType = gostR3410Key;
++	test_mech.mechanism = CKM_GOSTR3410;
++	break;
+     default:
+ 	PORT_SetError( SEC_ERROR_BAD_KEY );
+ 	return NULL;
+     }
+ 
+     /* now query the slot to find out how "good" a key we can generate */
+     if (!slot->isThreadSafe) PK11_EnterSlotMonitor(slot);
+     crv = PK11_GETTAB(slot)->C_GetMechanismInfo(slot->slotID,
+@@ -1365,16 +1466,20 @@ PK11_GenerateKeyPairWithOpFlags(PK11Slot
+ 	    mechanism_info.flags = CKF_DERIVE;
+ 	    if (test_mech2.mechanism == CKM_ECDSA) {
+ 		mechanism_info.flags |= CKF_SIGN | CKF_VERIFY;
+ 	    }
+ 	    break;
+ 	case CKM_ECDSA:
+ 	    mechanism_info.flags =  CKF_SIGN | CKF_VERIFY;
+ 	    break;
++	case CKM_GOSTR3410:
++	    mechanism_info.flags =  CKF_SIGN | CKF_VERIFY | CKF_DERIVE |
++	            CKF_WRAP | CKF_UNWRAP;
++	    break;
+ 	default:
+ 	    break;
+ 	}
+     }
+     /* now adjust our flags according to the user's key usage passed to us */
+     mechanism_info.flags = (mechanism_info.flags & (~opFlagsMask)) | opFlags;
+     /* set the public key attributes */
+     attrs += pk11_AttrFlagsToAttributes(pubKeyAttrFlags, attrs,
+@@ -1588,16 +1693,17 @@ PK11_ImportEncryptedPrivateKeyInfo(PK11S
+     int usageCount = 0;
+     CK_KEY_TYPE key_type;
+     CK_ATTRIBUTE_TYPE *usage = NULL;
+     CK_ATTRIBUTE_TYPE rsaUsage[] = {
+ 		 CKA_UNWRAP, CKA_DECRYPT, CKA_SIGN, CKA_SIGN_RECOVER };
+     CK_ATTRIBUTE_TYPE dsaUsage[] = { CKA_SIGN };
+     CK_ATTRIBUTE_TYPE dhUsage[] = { CKA_DERIVE };
+     CK_ATTRIBUTE_TYPE ecUsage[] = { CKA_SIGN, CKA_DERIVE };
++    CK_ATTRIBUTE_TYPE gostR3410Usage[] = { CKA_SIGN, CKA_DERIVE, CKA_UNWRAP };
+     if((epki == NULL) || (pwitem == NULL))
+ 	return SECFailure;
+ 
+     pbeMechType = PK11_AlgtagToMechanism(SECOID_FindOIDTag(
+ 					&epki->algorithm.algorithm));
+ 
+     switch (keyType) {
+     default:
+@@ -1642,16 +1748,31 @@ PK11_ImportEncryptedPrivateKeyInfo(PK11S
+ 	    break;
+ 	case KU_DIGITAL_SIGNATURE|KU_KEY_AGREEMENT:
+ 	default: /* default to everything */
+ 	    usage = ecUsage;
+ 	    usageCount = 2;
+ 	    break;
+ 	}
+ 	break;	
++    case gostR3410Key:
++	key_type = CKK_GOSTR3410;
++	usage = gostR3410Usage;
++	usageCount = 0;
++	if (keyUsage & (KU_KEY_ENCIPHERMENT | KU_DIGITAL_SIGNATURE |
++	        KU_KEY_AGREEMENT) == 0)
++	    keyUsage |= KU_KEY_ENCIPHERMENT | KU_DIGITAL_SIGNATURE |
++	            KU_KEY_AGREEMENT;
++	if (keyUsage & KU_DIGITAL_SIGNATURE)
++	    gostR3410Usage[usageCount++] = CKA_SIGN;
++	if (keyUsage & KU_KEY_ENCIPHERMENT)
++	    gostR3410Usage[usageCount++] = CKA_UNWRAP;
++	if (keyUsage & KU_KEY_AGREEMENT)
++	    gostR3410Usage[usageCount++] = CKA_DERIVE;
++	break;
+     }
+ 
+ try_faulty_3des:
+ 
+     key = PK11_PBEKeyGen(slot, &epki->algorithm, pwitem, faulty3DES, wincx);
+     if (key == NULL) {
+ 	rv = SECFailure;
+ 	goto done;
+diff --git a/security/nss/lib/pk11wrap/pk11cert.c b/security/nss/lib/pk11wrap/pk11cert.c
+--- a/security/nss/lib/pk11wrap/pk11cert.c
++++ b/security/nss/lib/pk11wrap/pk11cert.c
+@@ -187,16 +187,21 @@ PK11_IsUserCert(PK11SlotInfo *slot, CERT
+ 	    PK11_SETATTRS(&theTemplate,CKA_VALUE, pubKey->u.dh.publicValue.data,
+ 						pubKey->u.dh.publicValue.len);
+ 	    break;
+ 	case ecKey:
+ 	    PK11_SETATTRS(&theTemplate,CKA_EC_POINT, 
+ 			  pubKey->u.ec.publicValue.data,
+ 			  pubKey->u.ec.publicValue.len);
+ 	    break;
++	case gostR3410Key:
++	    PK11_SETATTRS(&theTemplate, CKA_VALUE,
++	                  pubKey->u.gostR3410.publicValue.data,
++	                  pubKey->u.gostR3410.publicValue.len);
++	    break;
+ 	case keaKey:
+ 	case fortezzaKey:
+ 	case nullKey:
+ 	    /* fall through and return false */
+ 	    break;
+ 	}
+ 
+ 	if (theTemplate.ulValueLen == 0) {
+@@ -882,16 +887,19 @@ PK11_GetPubIndexKeyID(CERTCertificate *c
+         newItem = SECITEM_DupItem(&pubk->u.dsa.publicValue);
+ 	break;
+     case dhKey:
+         newItem = SECITEM_DupItem(&pubk->u.dh.publicValue);
+ 	break;
+     case ecKey:
+         newItem = SECITEM_DupItem(&pubk->u.ec.publicValue);
+ 	break;
++    case gostR3410Key:
++        newItem = SECITEM_DupItem(&pubk->u.gostR3410.publicValue);
++	break;
+     case fortezzaKey:
+     default:
+ 	newItem = NULL; /* Fortezza Fix later... */
+     }
+     SECKEY_DestroyPublicKey(pubk);
+     /* make hash of it */
+     return newItem;
+ }
+diff --git a/security/nss/lib/pk11wrap/pk11cxt.c b/security/nss/lib/pk11wrap/pk11cxt.c
+--- a/security/nss/lib/pk11wrap/pk11cxt.c
++++ b/security/nss/lib/pk11wrap/pk11cxt.c
+@@ -110,17 +110,17 @@ pk11_saveContextHelper(PK11Context *cont
+                        unsigned long *savedLength)
+ {
+     CK_RV crv;
+ 
+     /* If buffer is NULL, this will get the length */
+     crv = PK11_GETTAB(context->slot)->C_GetOperationState(context->session,
+                                                           (CK_BYTE_PTR)buffer,
+                                                           savedLength);
+-    if (!buffer || (crv == CKR_BUFFER_TOO_SMALL)) {
++    if ((!buffer && crv == CKR_OK) || (crv == CKR_BUFFER_TOO_SMALL)) {
+ 	/* the given buffer wasn't big enough (or was NULL), but we 
+ 	 * have the length, so try again with a new buffer and the 
+ 	 * correct length
+ 	 */
+ 	unsigned long bufLen = *savedLength;
+ 	buffer = PORT_Alloc(bufLen);
+ 	if (buffer == NULL) {
+ 	    return (unsigned char *)NULL;
+@@ -158,17 +158,21 @@ pk11_restoreContext(PK11Context *context
+ 			CK_INVALID_HANDLE;
+ 
+     PORT_Assert(space != NULL);
+     if (space == NULL) {
+ 	PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+ 	return SECFailure;
+     }
+     crv = PK11_GETTAB(context->slot)->C_SetOperationState(context->session,
+-        (CK_BYTE_PTR)space, savedLength, objectID, 0);
++        (CK_BYTE_PTR)space, savedLength,
++        (context->operation == CKA_ENCRYPT ||
++        context->operation == CKA_DECRYPT) ? objectID : CK_INVALID_HANDLE,
++        (context->operation == CKA_SIGN ||
++        context->operation == CKA_VERIFY) ? objectID : CK_INVALID_HANDLE);
+     if (crv != CKR_OK) {
+        PORT_SetError( PK11_MapError(crv));
+        return SECFailure;
+    }
+    return SECSuccess;
+ }
+ 
+ SECStatus pk11_Finalize(PK11Context *context);
+@@ -740,20 +744,20 @@ PK11_CipherOp(PK11Context *context, unsi
+ 	break;
+     default:
+ 	crv = CKR_OPERATION_NOT_INITIALIZED;
+ 	break;
+     }
+ 
+     if (crv != CKR_OK) {
+         PORT_SetError( PK11_MapError(crv) );
+-	*outlen = 0;
++	if (outlen) *outlen = 0;
+         rv = SECFailure;
+     } else {
+-    	*outlen = length;
++    	if (outlen) *outlen = length;
+     }
+ 
+     if (context->fortezzaHack) {
+ 	if (context->operation == CKA_ENCRYPT) {
+ 	    PORT_Assert(allocOut);
+ 	    PORT_Memcpy(saveOut, allocOut, length);
+ 	    PORT_Free(allocOut);
+ 	}
+diff --git a/security/nss/lib/pk11wrap/pk11mech.c b/security/nss/lib/pk11wrap/pk11mech.c
+--- a/security/nss/lib/pk11wrap/pk11mech.c
++++ b/security/nss/lib/pk11wrap/pk11mech.c
+@@ -88,16 +88,17 @@ CK_MECHANISM_TYPE wrapMechanismList[] = 
+     CKM_KEY_WRAP_LYNKS,
+     CKM_IDEA_ECB,
+     CKM_CAST3_ECB,
+     CKM_CAST_ECB,
+     CKM_RC5_ECB,
+     CKM_RC2_ECB,
+     CKM_CDMF_ECB,
+     CKM_SKIPJACK_WRAP,
++    CKM_GOST28147_ECB,
+ };
+ 
+ int wrapMechanismCount = sizeof(wrapMechanismList)/sizeof(wrapMechanismList[0]);
+ 
+ /*********************************************************************
+  *       Mechanism Mapping functions
+  *********************************************************************/
+ 
+@@ -221,16 +222,20 @@ PK11_GetKeyMechanism(CK_KEY_TYPE type)
+     case CKK_DSA:
+ 	return CKM_DSA;
+     case CKK_DH:
+ 	return CKM_DH_PKCS_DERIVE;
+     case CKK_KEA:
+ 	return CKM_KEA_KEY_DERIVE;
+     case CKK_EC:  /* CKK_ECDSA is deprecated */
+ 	return CKM_ECDSA;
++    case CKK_GOSTR3410:
++	return CKM_GOSTR3410;
++    case CKK_GOST28147:
++	return CKM_GOST28147;
+     case CKK_GENERIC_SECRET:
+     default:
+ 	return CKM_SHA_1_HMAC;
+     }
+ }
+ 
+ /*
+  * Get the key type needed for the given mechanism
+@@ -390,16 +395,26 @@ PK11_GetKeyType(CK_MECHANISM_TYPE type,u
+     case CKM_KEA_KEY_DERIVE:
+     case CKM_KEA_KEY_PAIR_GEN:
+ 	return CKK_KEA;
+     case CKM_ECDSA:
+     case CKM_ECDSA_SHA1:
+     case CKM_EC_KEY_PAIR_GEN: /* aka CKM_ECDSA_KEY_PAIR_GEN */
+     case CKM_ECDH1_DERIVE:
+ 	return CKK_EC;  /* CKK_ECDSA is deprecated */
++    case CKM_GOSTR3410:
++    case CKM_GOSTR3410_WITH_GOSTR3411:
++    case CKM_GOSTR3410_KEY_WRAP:
++    case CKM_GOSTR3410_DERIVE:
++	return CKK_GOSTR3410;
++    case CKM_GOST28147_ECB:
++    case CKM_GOST28147:
++    case CKM_GOST28147_MAC:
++    case CKM_GOST28147_KEY_WRAP:
++	return CKK_GOST28147;
+     case CKM_SSL3_PRE_MASTER_KEY_GEN:
+     case CKM_GENERIC_SECRET_KEY_GEN:
+     case CKM_SSL3_MASTER_KEY_DERIVE:
+     case CKM_SSL3_MASTER_KEY_DERIVE_DH:
+     case CKM_SSL3_KEY_AND_MAC_DERIVE:
+     case CKM_SSL3_SHA1_MAC:
+     case CKM_SSL3_MD5_MAC:
+     case CKM_TLS_MASTER_KEY_DERIVE:
+@@ -413,16 +428,17 @@ PK11_GetKeyType(CK_MECHANISM_TYPE type,u
+     case CKM_SHA384_HMAC_GENERAL:
+     case CKM_SHA512_HMAC:
+     case CKM_SHA512_HMAC_GENERAL:
+     case CKM_MD2_HMAC:
+     case CKM_MD2_HMAC_GENERAL:
+     case CKM_MD5_HMAC:
+     case CKM_MD5_HMAC_GENERAL:
+     case CKM_TLS_PRF_GENERAL:
++    case CKM_GOSTR3411_HMAC:
+ 	return CKK_GENERIC_SECRET;
+     default:
+ 	return pk11_lookup(type)->keyType;
+     }
+ }
+ 
+ /*
+  * Get the Key Gen Mechanism needed for the given 
+@@ -578,16 +594,28 @@ PK11_GetKeyGenWithSize(CK_MECHANISM_TYPE
+     case CKM_KEA_KEY_DERIVE:
+     case CKM_KEA_KEY_PAIR_GEN:
+ 	return CKM_KEA_KEY_PAIR_GEN;
+     case CKM_ECDSA:
+     case CKM_ECDSA_SHA1:
+     case CKM_EC_KEY_PAIR_GEN: /* aka CKM_ECDSA_KEY_PAIR_GEN */
+     case CKM_ECDH1_DERIVE:
+         return CKM_EC_KEY_PAIR_GEN; 
++    case CKM_GOSTR3410:
++    case CKM_GOSTR3410_WITH_GOSTR3411:
++    case CKM_GOSTR3410_KEY_WRAP:
++    case CKM_GOSTR3410_DERIVE:
++    case CKM_GOSTR3410_KEY_PAIR_GEN:
++	return CKM_GOSTR3410_KEY_PAIR_GEN;
++    case CKM_GOST28147_ECB:
++    case CKM_GOST28147:
++    case CKM_GOST28147_MAC:
++    case CKM_GOST28147_KEY_WRAP:
++    case CKM_GOST28147_KEY_GEN:
++	return CKM_GOST28147_KEY_GEN;
+     case CKM_SSL3_PRE_MASTER_KEY_GEN:
+     case CKM_SSL3_MASTER_KEY_DERIVE:
+     case CKM_SSL3_KEY_AND_MAC_DERIVE:
+     case CKM_SSL3_SHA1_MAC:
+     case CKM_SSL3_MD5_MAC:
+     case CKM_TLS_MASTER_KEY_DERIVE:
+     case CKM_TLS_KEY_AND_MAC_DERIVE:
+ 	return CKM_SSL3_PRE_MASTER_KEY_GEN;
+@@ -599,16 +627,17 @@ PK11_GetKeyGenWithSize(CK_MECHANISM_TYPE
+     case CKM_SHA384_HMAC_GENERAL:
+     case CKM_SHA512_HMAC:
+     case CKM_SHA512_HMAC_GENERAL:
+     case CKM_MD2_HMAC:
+     case CKM_MD2_HMAC_GENERAL:
+     case CKM_MD5_HMAC:
+     case CKM_MD5_HMAC_GENERAL:
+     case CKM_TLS_PRF_GENERAL:
++    case CKM_GOSTR3411_HMAC:
+     case CKM_GENERIC_SECRET_KEY_GEN:
+ 	return CKM_GENERIC_SECRET_KEY_GEN;
+     case CKM_PBE_MD2_DES_CBC:
+     case CKM_PBE_MD5_DES_CBC:
+     case CKM_PBA_SHA1_WITH_SHA1_HMAC:
+     case CKM_NETSCAPE_PBE_SHA1_HMAC_KEY_GEN:
+     case CKM_NETSCAPE_PBE_MD5_HMAC_KEY_GEN:
+     case CKM_NETSCAPE_PBE_MD2_HMAC_KEY_GEN:
+@@ -656,16 +685,17 @@ PK11_GetBlockSize(CK_MECHANISM_TYPE type
+ 	return 8;
+     case CKM_DES_ECB:
+     case CKM_DES3_ECB:
+     case CKM_RC2_ECB:
+     case CKM_IDEA_ECB:
+     case CKM_CAST_ECB:
+     case CKM_CAST3_ECB:
+     case CKM_CAST5_ECB:
++    case CKM_GOST28147_ECB:
+     case CKM_RC2_CBC:
+     case CKM_SKIPJACK_CBC64:
+     case CKM_SKIPJACK_ECB64:
+     case CKM_SKIPJACK_OFB64:
+     case CKM_SKIPJACK_CFB64:
+     case CKM_DES_CBC:
+     case CKM_DES3_CBC:
+     case CKM_IDEA_CBC:
+@@ -715,16 +745,17 @@ PK11_GetBlockSize(CK_MECHANISM_TYPE type
+ 	return 16;
+     case CKM_BATON_ECB96:
+ 	return 12;
+     case CKM_RC4:
+     case CKM_NETSCAPE_PBE_SHA1_40_BIT_RC4:
+     case CKM_NETSCAPE_PBE_SHA1_128_BIT_RC4:
+     case CKM_PBE_SHA1_RC4_40:
+     case CKM_PBE_SHA1_RC4_128:
++    case CKM_GOST28147:
+ 	return 0;
+     case CKM_RSA_PKCS:
+     case CKM_RSA_9796:
+     case CKM_RSA_X_509:
+ 	/*actually it's the modulus length of the key!*/
+ 	return -1;	/* failure */
+     default:
+ 	return pk11_lookup(type)->blockSize;
+@@ -740,16 +771,18 @@ PK11_GetIVLength(CK_MECHANISM_TYPE type)
+     switch (type) {
+     case CKM_SEED_ECB:
+     case CKM_CAMELLIA_ECB:
+     case CKM_AES_ECB:
+     case CKM_DES_ECB:
+     case CKM_DES3_ECB:
+     case CKM_RC2_ECB:
+     case CKM_IDEA_ECB:
++    case CKM_GOST28147_ECB:
++    case CKM_GOST28147_KEY_WRAP:
+     case CKM_SKIPJACK_WRAP:
+     case CKM_BATON_WRAP:
+     case CKM_RC5_ECB:
+     case CKM_CAST_ECB:
+     case CKM_CAST3_ECB:
+     case CKM_CAST5_ECB:
+ 	return 0;
+     case CKM_RC2_CBC:
+@@ -774,16 +807,18 @@ PK11_GetIVLength(CK_MECHANISM_TYPE type)
+     case CKM_RC2_CBC_PAD:
+     case CKM_DES_CBC_PAD:
+     case CKM_DES3_CBC_PAD:
+     case CKM_IDEA_CBC_PAD:
+     case CKM_RC5_CBC_PAD:
+     case CKM_CAST_CBC_PAD:
+     case CKM_CAST3_CBC_PAD:
+     case CKM_CAST5_CBC_PAD:
++    case CKM_GOST28147:
++    case CKM_GOST28147_MAC:
+ 	return 8;
+     case CKM_SEED_CBC:
+     case CKM_SEED_CBC_PAD:
+     case CKM_CAMELLIA_CBC:
+     case CKM_CAMELLIA_CBC_PAD:
+     case CKM_AES_CBC:
+     case CKM_AES_CBC_PAD:
+ 	return 16;
+@@ -846,16 +881,17 @@ pk11_ParamFromIVWithLen(CK_MECHANISM_TYP
+     case CKM_RSA_PKCS:
+     case CKM_RSA_X_509:
+     case CKM_RSA_9796:
+     case CKM_IDEA_ECB:
+     case CKM_CDMF_ECB:
+     case CKM_CAST_ECB:
+     case CKM_CAST3_ECB:
+     case CKM_CAST5_ECB:
++    case CKM_GOST28147_ECB:
+     case CKM_RC4:
+ 	break;
+     case CKM_RC2_ECB:
+ 	rc2_ecb_params = (CK_RC2_PARAMS *)PORT_Alloc(sizeof(CK_RC2_PARAMS));
+ 	if (rc2_ecb_params == NULL) break;
+ 	/*  Maybe we should pass the key size in too to get this value? */
+ 	*rc2_ecb_params = keyLen ? keyLen*8 : 128;
+ 	param->data = (unsigned char *) rc2_ecb_params;
+@@ -935,16 +971,17 @@ pk11_ParamFromIVWithLen(CK_MECHANISM_TYP
+     case CKM_BATON_ECB96:
+     case CKM_BATON_CBC128:
+     case CKM_BATON_COUNTER:
+     case CKM_BATON_SHUFFLE:
+     case CKM_JUNIPER_ECB128:
+     case CKM_JUNIPER_CBC128:
+     case CKM_JUNIPER_COUNTER:
+     case CKM_JUNIPER_SHUFFLE:
++    case CKM_GOST28147:
+ 	if ((iv == NULL) || (iv->data == NULL)) break;
+ 	param->data = (unsigned char*)PORT_Alloc(iv->len);
+ 	if (param->data != NULL) {
+ 	    PORT_Memcpy(param->data,iv->data,iv->len);
+ 	    param->len = iv->len;
+ 	}
+ 	break;
+      /* unknown mechanism, pass IV in if it's there */
+@@ -991,16 +1028,17 @@ PK11_IVFromParam(CK_MECHANISM_TYPE type,
+     case CKM_RSA_PKCS:
+     case CKM_RSA_X_509:
+     case CKM_RSA_9796:
+     case CKM_IDEA_ECB:
+     case CKM_CDMF_ECB:
+     case CKM_CAST_ECB:
+     case CKM_CAST3_ECB:
+     case CKM_CAST5_ECB:
++    case CKM_GOST28147_ECB:
+     case CKM_RC4:
+ 	return NULL;
+     case CKM_RC2_ECB:
+ 	return NULL;
+     case CKM_RC2_CBC:
+     case CKM_RC2_CBC_PAD:
+ 	rc2_params = (CK_RC2_CBC_PARAMS *)param->data;
+         *len = sizeof(rc2_params->iv);
+@@ -1040,16 +1078,17 @@ PK11_IVFromParam(CK_MECHANISM_TYPE type,
+     case CKM_BATON_ECB96:
+     case CKM_BATON_CBC128:
+     case CKM_BATON_COUNTER:
+     case CKM_BATON_SHUFFLE:
+     case CKM_JUNIPER_ECB128:
+     case CKM_JUNIPER_CBC128:
+     case CKM_JUNIPER_COUNTER:
+     case CKM_JUNIPER_SHUFFLE:
++    case CKM_GOST28147:
+ 	break;
+      /* unknown mechanism, pass IV in if it's there */
+      default:
+ 	break;
+      }
+      if (param->data) {
+ 	*len = param->len;
+      }
+@@ -1134,16 +1173,57 @@ static unsigned long  rc2_unmap(unsigned
+     switch (x) {
+         case 128: return 58;
+         case 64: return 120;
+         case 40: return 160;
+     }
+     return 58; 
+ }
+ 
++typedef struct sec_gost28147ParameterStr {
++	SECItem iv;
++	SECItem gost28147Params;
++} sec_gost28147Parameter;
++
++static const SEC_ASN1Template sec_gost28147_parameter_template[] = {
++	{ SEC_ASN1_SEQUENCE, 0, NULL, sizeof(sec_gost28147Parameter) },
++	{ SEC_ASN1_OCTET_STRING, offsetof(sec_gost28147Parameter,iv) },
++	/* this is an OID, but we need it encoded */
++	{ SEC_ASN1_ANY, offsetof(sec_gost28147Parameter,gost28147Params) },
++	{ 0 }
++};
++
++SECStatus
++PK11_DecodeGOST28147AlgorithmIDParams(PRArenaPool *arena, SECItem *parameters,
++		SECItem *keyParam, SECItem *ivec)
++{
++    SECStatus rv;
++    sec_gost28147Parameter gost28147 =
++            { {siBuffer, NULL, 0}, {siBuffer, NULL, 0} };
++
++    rv = SEC_ASN1DecodeItem(arena, &gost28147, sec_gost28147_parameter_template,
++							parameters);
++    /* check if gost28147.gost28147Params is an OID */
++    if (rv == SECSuccess && (!gost28147.gost28147Params.len ||
++            gost28147.gost28147Params.data[0] != SEC_ASN1_OBJECT_ID))
++        rv = SECFailure;
++
++    if (rv == SECSuccess) { 
++        if (keyParam) {
++        	keyParam->data = gost28147.gost28147Params.data;
++        	keyParam->len = gost28147.gost28147Params.len;
++        }
++        if (ivec) {
++        	ivec->data = gost28147.iv.data;
++        	ivec->len = gost28147.iv.len;
++        }
++    }
++
++    return rv;
++}
+ 
+ 
+ /* Generate a mechaism param from a type, and iv. */
+ SECItem *
+ PK11_ParamFromAlgid(SECAlgorithmID *algid)
+ {
+     CK_RC2_CBC_PARAMS * rc2_cbc_params = NULL;
+     CK_RC2_PARAMS *     rc2_ecb_params = NULL;
+@@ -1243,16 +1323,29 @@ PK11_ParamFromAlgid(SECAlgorithmID *algi
+ 	mech->len = sizeof *rc5_cbc_params;
+ 	rc5_cbc_params->ulRounds   = DER_GetInteger(&rc5.rounds);
+ 	rc5_cbc_params->ulWordsize = DER_GetInteger(&rc5.blockSizeInBits)/8;
+         rc5_cbc_params->pIv        = ((CK_BYTE_PTR)rc5_cbc_params)
+ 						+ sizeof(CK_RC5_CBC_PARAMS);
+         rc5_cbc_params->ulIvLen    = rc5.iv.len;
+ 	PORT_Memcpy(rc5_cbc_params->pIv, rc5.iv.data, rc5.iv.len);
+ 	break;
++    case CKM_GOST28147:
++	rv = PK11_DecodeGOST28147AlgorithmIDParams(arena,
++	        &(algid->parameters), NULL, &iv);
++	if (rv != SECSuccess || iv.data == NULL) {
++	    goto loser;
++	}
++	mech->data = (unsigned char*)PORT_Alloc(iv.len);
++	if (mech->data == NULL) {
++	    goto loser;
++	}
++	PORT_Memcpy(mech->data, iv.data, iv.len);
++	mech->len = iv.len;
++	break;
+     case CKM_PBE_MD2_DES_CBC:
+     case CKM_PBE_MD5_DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_TRIPLE_DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_FAULTY_3DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_40_BIT_RC2_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_128_BIT_RC2_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_40_BIT_RC4:
+@@ -1405,16 +1498,17 @@ pk11_GenerateNewParamWithKeyLen(CK_MECHA
+     case CKM_AES_ECB:
+     case CKM_DES_ECB:
+     case CKM_DES3_ECB:
+     case CKM_IDEA_ECB:
+     case CKM_CDMF_ECB:
+     case CKM_CAST_ECB:
+     case CKM_CAST3_ECB:
+     case CKM_CAST5_ECB:
++    case CKM_GOST28147_ECB:
+ 	mech->data = NULL;
+ 	mech->len = 0;
+ 	break;
+     case CKM_RC2_ECB:
+ 	rc2_ecb_params = (CK_RC2_PARAMS *)PORT_Alloc(sizeof(CK_RC2_PARAMS));
+ 	if (rc2_ecb_params == NULL) {
+ 	    rv = SECFailure;
+ 	    break;
+@@ -1491,16 +1585,17 @@ pk11_GenerateNewParamWithKeyLen(CK_MECHA
+     case CKM_BATON_ECB96:
+     case CKM_BATON_CBC128:
+     case CKM_BATON_COUNTER:
+     case CKM_BATON_SHUFFLE:
+     case CKM_JUNIPER_ECB128:
+     case CKM_JUNIPER_CBC128:
+     case CKM_JUNIPER_COUNTER:
+     case CKM_JUNIPER_SHUFFLE:
++    case CKM_GOST28147:
+ 	rv = pk11_GenIV(type,&iv);
+ 	if (rv != SECSuccess) {
+ 	    break;
+ 	}
+ 	mech->data = (unsigned char*)PORT_Alloc(iv.len);
+ 	if (mech->data == NULL) {
+ 	    PORT_Free(iv.data);
+ 	    rv = SECFailure;
+@@ -1524,24 +1619,28 @@ PK11_GenerateNewParam(CK_MECHANISM_TYPE 
+ { 
+     int keyLen = key ? PK11_GetKeyLength(key) :  0;
+ 
+     return pk11_GenerateNewParamWithKeyLen(type, keyLen);
+ }
+ 
+ #define RC5_V10 0x10
+ 
++static const unsigned char gost28147_default_params[] =
++        { 0x06, 0x07, 0x2A, 0x85, 0x03, 0x02, 0x02, 0x1F, 0x01 };
++
+ /* turn a PKCS #11 parameter into a DER Encoded Algorithm ID */
+ SECStatus
+ PK11_ParamToAlgid(SECOidTag algTag, SECItem *param, 
+ 				PRArenaPool *arena, SECAlgorithmID *algid) {
+     CK_RC2_CBC_PARAMS *rc2_params;
+     sec_rc2cbcParameter rc2;
+     CK_RC5_CBC_PARAMS *rc5_params;
+     sec_rc5cbcParameter rc5;
++    sec_gost28147Parameter gost28147;
+     CK_MECHANISM_TYPE type = PK11_AlgtagToMechanism(algTag);
+     SECItem *newParams = NULL;
+     SECStatus rv = SECFailure;
+     unsigned long rc2version;
+ 
+     switch (type) {
+     case CKM_RC4:
+     case CKM_SEED_ECB:
+@@ -1549,16 +1648,17 @@ PK11_ParamToAlgid(SECOidTag algTag, SECI
+     case CKM_AES_ECB:
+     case CKM_DES_ECB:
+     case CKM_DES3_ECB:
+     case CKM_IDEA_ECB:
+     case CKM_CDMF_ECB:
+     case CKM_CAST_ECB:
+     case CKM_CAST3_ECB:
+     case CKM_CAST5_ECB:
++    case CKM_GOST28147_ECB:
+ 	newParams = NULL;
+ 	rv = SECSuccess;
+ 	break;
+     case CKM_RC2_ECB:
+ 	break;
+     case CKM_RC2_CBC:
+     case CKM_RC2_CBC_PAD:
+ 	rc2_params = (CK_RC2_CBC_PARAMS *)param->data;
+@@ -1600,16 +1700,27 @@ PK11_ParamToAlgid(SECOidTag algTag, SECI
+                                          sec_rc5cbc_parameter_template);
+         PORT_Free(rc5.version.data);
+         PORT_Free(rc5.blockSizeInBits.data);
+         PORT_Free(rc5.rounds.data);
+ 	if (newParams == NULL)
+ 	    break;
+ 	rv = SECSuccess;
+ 	break;
++    case CKM_GOST28147:
++	gost28147.iv.data = param->data;
++	gost28147.iv.len = param->len;
++	gost28147.gost28147Params.data = gost28147_default_params;
++	gost28147.gost28147Params.len = sizeof(gost28147_default_params);
++	newParams = SEC_ASN1EncodeItem (NULL, NULL, &gost28147,
++                                         sec_gost28147_parameter_template);
++	if (newParams == NULL)
++	    break;
++	rv = SECSuccess;
++	break;
+     case CKM_PBE_MD2_DES_CBC:
+     case CKM_PBE_MD5_DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_TRIPLE_DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_FAULTY_3DES_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_40_BIT_RC2_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_128_BIT_RC2_CBC:
+     case CKM_NETSCAPE_PBE_SHA1_40_BIT_RC4:
+@@ -1858,30 +1969,34 @@ PK11_MapSignKeyType(KeyType keyType)
+     switch (keyType) {
+     case rsaKey:
+ 	return CKM_RSA_PKCS;
+     case fortezzaKey:
+     case dsaKey:
+ 	return CKM_DSA;
+     case ecKey:
+ 	return CKM_ECDSA;
++    case gostR3410Key:
++	return CKM_GOSTR3410;
+     case dhKey:
+     default:
+ 	break;
+     }
+     return CKM_INVALID_MECHANISM;
+ }
+ 
+ CK_MECHANISM_TYPE
+ pk11_mapWrapKeyType(KeyType keyType)
+ {
+     switch (keyType) {
+     case rsaKey:
+ 	return CKM_RSA_PKCS;
+     /* Add fortezza?? */
++    case gostR3410Key:
++	return CKM_GOSTR3410_KEY_WRAP;
+     default:
+ 	break;
+     }
+     return CKM_INVALID_MECHANISM;
+ }
+ 
+ SECOidTag 
+ PK11_FortezzaMapSig(SECOidTag algTag)
+diff --git a/security/nss/lib/pk11wrap/pk11obj.c b/security/nss/lib/pk11wrap/pk11obj.c
+--- a/security/nss/lib/pk11wrap/pk11obj.c
++++ b/security/nss/lib/pk11wrap/pk11obj.c
+@@ -579,16 +579,18 @@ PK11_SignatureLen(SECKEYPrivateKey *key)
+ 		if (length == 0) {
+ 		    return pk11_backupGetSignLength(key);
+ 		}
+ 		length = ((length + 7)/8) * 2;
+ 		return length;
+ 	    }
+ 	}
+ 	break;
++    case gostR3410Key:
++	return 64;
+     default:
+ 	break;
+     }
+     PORT_SetError( SEC_ERROR_INVALID_KEY );
+     return 0;
+ }
+ 
+ /*
+diff --git a/security/nss/lib/pk11wrap/pk11pbe.c b/security/nss/lib/pk11wrap/pk11pbe.c
+--- a/security/nss/lib/pk11wrap/pk11pbe.c
++++ b/security/nss/lib/pk11wrap/pk11pbe.c
+@@ -665,17 +665,18 @@ sec_pkcs5CreateAlgorithmID(SECOidTag alg
+ 	        keyLength = PK11_GetMaxKeyLength(cryptoMech);
+ 	    }
+ 	    if (keyLength == 0) {
+ 		goto loser;
+ 	    }
+ 	}
+ 	/* currently only SEC_OID_HMAC_SHA1 is defined */
+ 	if (prfAlg == SEC_OID_UNKNOWN) {
+-	    prfAlg = SEC_OID_HMAC_SHA1;
++	    prfAlg = (cipherAlgorithm == SEC_OID_GOST28147) ?
++	            SEC_OID_GOSTR3411_HMAC : SEC_OID_HMAC_SHA1;
+ 	}
+ 
+ 	/* build the PKCS5v2 cipher algorithm id */
+ 	cipherParams = pk11_GenerateNewParamWithKeyLen(	
+ 			PK11_AlgtagToMechanism(cipherAlgorithm), keyLength);
+ 	if (!cipherParams) {
+ 	    goto loser;
+ 	}
+@@ -834,16 +835,18 @@ pbe_PK11AlgidToParam(SECAlgorithmID *alg
+ 	/* set the prf */
+ 	prfAlgTag = SEC_OID_HMAC_SHA1;
+  	if (p5_param.pPrfAlgId &&
+  	    p5_param.pPrfAlgId->algorithm.data != 0) {
+  	    prfAlgTag = SECOID_GetAlgorithmTag(p5_param.pPrfAlgId);
+ 	}
+ 	if (prfAlgTag == SEC_OID_HMAC_SHA1) {
+ 	    pbeV2_params->prf = CKP_PKCS5_PBKD2_HMAC_SHA1;
++	} else if (prfAlgTag == SEC_OID_GOSTR3411_HMAC) {
++	    pbeV2_params->prf = CKP_PKCS5_PBKD2_HMAC_GOSTR3411;
+ 	} else {
+ 	    /* only SHA1_HMAC is currently supported by PKCS #11 */
+ 	    PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+ 	    goto loser;
+ 	}
+ 	
+ 	/* probably should fetch these from the prfAlgid */
+ 	pbeV2_params->pPrfData = NULL;
+@@ -1277,17 +1280,20 @@ PK11_CreatePBEV2AlgorithmID(SECOidTag pb
+ /*
+  * private.
+  */
+ PK11SymKey *
+ pk11_RawPBEKeyGenWithKeyType(PK11SlotInfo *slot, CK_MECHANISM_TYPE type, 
+ 			SECItem *params, CK_KEY_TYPE keyType, int keyLen,
+ 			SECItem *pwitem, void *wincx)
+ {
++    CK_BYTE_PTR pwLocal = NULL;
++    unsigned int pwLocalLen = 0;
+     CK_ULONG pwLen;
++    PK11SymKey *key = NULL;
+     /* do some sanity checks */
+     if ((params == NULL) || (params->data == NULL)) {
+ 	PORT_SetError(SEC_ERROR_INVALID_ARGS);
+ 	return NULL;
+     }
+ 
+     if (type == CKM_INVALID_MECHANISM) {
+ 	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+@@ -1297,34 +1303,52 @@ pk11_RawPBEKeyGenWithKeyType(PK11SlotInf
+     /* set the password pointer in the parameters... */
+     if (type == CKM_PKCS5_PBKD2) {
+     	CK_PKCS5_PBKD2_PARAMS *pbev2_params;
+ 	if (params->len < sizeof(CK_PKCS5_PBKD2_PARAMS)) {
+ 	    PORT_SetError(SEC_ERROR_INVALID_ARGS);
+ 	    return NULL;
+ 	}
+ 	pbev2_params = (CK_PKCS5_PBKD2_PARAMS *)params->data;
+-	pbev2_params->pPassword = pwitem->data;
+-	pwLen = pwitem->len;
++	/* XXX when PKCS#5v2 is used in PKCS#12, if we see BMPString with
++	 * trailing zero we have to convert it to UTF-8 string without zero.
++	 * If this conversion breaks compatibility with some standard or
++	 * working implementation, this procedure should be moved to PKCS#12
++	 * handling functions.
++	 */
++	if (pwitem->len && !(pwitem->len & 1) &&
++	        !pwitem->data[pwitem->len - 2] &&
++	        !pwitem->data[pwitem->len - 1]) {
++	    pwLocal = PORT_Alloc(pwitem->len * 2);
++	    PORT_UCS2_UTF8Conversion(PR_FALSE, pwitem->data, pwitem->len,
++	            pwLocal, pwitem->len * 2, &pwLocalLen);
++	    pwLen = pwLocalLen - 1; /* remove trailing zero */
++	    pbev2_params->pPassword = pwLocal;
++	} else {
++	    pbev2_params->pPassword = pwitem->data;
++	    pwLen = pwitem->len;
++	}
+ 	pbev2_params->ulPasswordLen = &pwLen;
+     } else {
+     	CK_PBE_PARAMS *pbe_params;
+ 	if (params->len < sizeof(CK_PBE_PARAMS)) {
+ 	    PORT_SetError(SEC_ERROR_INVALID_ARGS);
+ 	    return NULL;
+ 	}
+ 	pbe_params = (CK_PBE_PARAMS *)params->data;
+ 	pbe_params->pPassword = pwitem->data;
+ 	pbe_params->ulPasswordLen = pwitem->len;
+     }
+ 
+     /* generate the key (and sometimes the IV as a side effect...) */
+-    return pk11_TokenKeyGenWithFlagsAndKeyType(slot, type, params, keyType, 
++    key = pk11_TokenKeyGenWithFlagsAndKeyType(slot, type, params, keyType, 
+ 	   keyLen, NULL, CKF_SIGN|CKF_ENCRYPT|CKF_DECRYPT|CKF_UNWRAP|CKF_WRAP, 
+ 	   0, wincx);
++    if (pwLocal) PORT_Free(pwLocal);
++    return key;
+ }
+ 
+ /*
+  * public, deprecated. use PK11_PBEKeyGen instead.
+  */
+ PK11SymKey *
+ PK11_RawPBEKeyGen(PK11SlotInfo *slot, CK_MECHANISM_TYPE type, SECItem *mech,
+ 			 SECItem *pwitem, PRBool faulty3DES, void *wincx)
+diff --git a/security/nss/lib/pk11wrap/pk11pk12.c b/security/nss/lib/pk11wrap/pk11pk12.c
+--- a/security/nss/lib/pk11wrap/pk11pk12.c
++++ b/security/nss/lib/pk11wrap/pk11pk12.c
+@@ -94,25 +94,36 @@ struct SECKEYDHPrivateKeyStr {
+     PRArenaPool * arena;
+     SECItem prime;
+     SECItem base;
+     SECItem privateValue;
+ };
+ typedef struct SECKEYDHPrivateKeyStr SECKEYDHPrivateKey;
+ 
+ /*
++** GOST R34.10-2001 Private Key structures
++*/
++
++struct SECKEYGOSTR3410PrivateKeyStr {
++    SECKEYGOSTR3410Params params;
++    SECItem privateValue;
++};
++typedef struct SECKEYGOSTR3410PrivateKeyStr SECKEYGOSTR3410PrivateKey;
++
++/*
+ ** raw private key object
+ */
+ struct SECKEYRawPrivateKeyStr {
+     PLArenaPool *arena;
+     KeyType keyType;
+     union {
+         SECKEYRSAPrivateKey rsa;
+         SECKEYDSAPrivateKey dsa;
+         SECKEYDHPrivateKey  dh;
++        SECKEYGOSTR3410PrivateKey gostR3410;
+     } u;
+ };
+ typedef struct SECKEYRawPrivateKeyStr SECKEYRawPrivateKey;
+ 
+ SEC_ASN1_MKSUB(SEC_AnyTemplate)
+ SEC_ASN1_MKSUB(SECOID_AlgorithmIDTemplate)
+ 
+ /* ASN1 Templates for new decoder/encoder */
+@@ -168,16 +179,22 @@ const SEC_ASN1Template SECKEY_DSAPrivate
+ };
+ 
+ const SEC_ASN1Template SECKEY_DHPrivateKeyExportTemplate[] = {
+     { SEC_ASN1_INTEGER, offsetof(SECKEYRawPrivateKey,u.dh.privateValue) },
+     { SEC_ASN1_INTEGER, offsetof(SECKEYRawPrivateKey,u.dh.base) },
+     { SEC_ASN1_INTEGER, offsetof(SECKEYRawPrivateKey,u.dh.prime) },
+ };
+ 
++const SEC_ASN1Template SECKEY_GOSTR3410PrivateKeyExportTemplate[] = {
++    { SEC_ASN1_OCTET_STRING,
++        offsetof(SECKEYRawPrivateKey,u.gostR3410.privateValue) },
++    { 0 }
++};
++
+ const SEC_ASN1Template SECKEY_EncryptedPrivateKeyInfoTemplate[] = {
+     { SEC_ASN1_SEQUENCE,
+         0, NULL, sizeof(SECKEYEncryptedPrivateKeyInfo) },
+     { SEC_ASN1_INLINE | SEC_ASN1_XTRN,
+         offsetof(SECKEYEncryptedPrivateKeyInfo,algorithm),
+         SEC_ASN1_SUB(SECOID_AlgorithmIDTemplate) },
+     { SEC_ASN1_OCTET_STRING,
+         offsetof(SECKEYEncryptedPrivateKeyInfo,encryptedData) },
+@@ -412,16 +429,49 @@ PK11_ImportAndReturnPrivateKey(PK11SlotI
+ 	    PK11_SETATTRS(attrs, CKA_PRIME,    lpk->u.dh.prime.data,
+ 				lpk->u.dh.prime.len); attrs++;
+ 	    PK11_SETATTRS(attrs, CKA_BASE,  lpk->u.dh.base.data,
+ 					lpk->u.dh.base.len); attrs++;
+ 	    PK11_SETATTRS(attrs, CKA_VALUE,    lpk->u.dh.privateValue.data, 
+ 					lpk->u.dh.privateValue.len); attrs++;
+ 	    break;
+ 	/* what about fortezza??? */
++    case gostR3410Key:
++	    keyType = CKK_GOSTR3410;
++	    if( publicValue == NULL ) {
++		goto loser;
++	    }
++	    PK11_SETATTRS(attrs, CKA_SIGN, &cktrue, sizeof(CK_BBOOL)); attrs++;
++	    PK11_SETATTRS(attrs, CKA_UNWRAP, &cktrue, sizeof(CK_BBOOL)); attrs++;
++	    PK11_SETATTRS(attrs, CKA_DERIVE, &cktrue, sizeof(CK_BBOOL)); attrs++;
++	    if(nickname) {
++		PK11_SETATTRS(attrs, CKA_LABEL, nickname->data, nickname->len);
++		attrs++; 
++	    } 
++	    ck_id = PK11_MakeIDFromPubKey(publicValue);
++	    if (ck_id == NULL) {
++		goto loser;
++	    }
++	    PK11_SETATTRS(attrs, CKA_ID, ck_id->data,ck_id->len); attrs++;
++	    signedattr = attrs;
++	    PK11_SETATTRS(attrs, CKA_VALUE,
++	            lpk->u.gostR3410.privateValue.data,
++	            lpk->u.gostR3410.privateValue.len); attrs++;
++	    PK11_SETATTRS(attrs, CKA_GOSTR3410PARAMS,
++	            lpk->u.gostR3410.params.gostR3410Params.data,
++	            lpk->u.gostR3410.params.gostR3410Params.len); attrs++;
++	    PK11_SETATTRS(attrs, CKA_GOSTR3411PARAMS,
++	            lpk->u.gostR3410.params.gostR3411Params.data,
++	            lpk->u.gostR3410.params.gostR3411Params.len); attrs++;
++	    if (lpk->u.gostR3410.params.gost28147Params.len > 0) {
++	        PK11_SETATTRS(attrs, CKA_GOST28147PARAMS,
++	                lpk->u.gostR3410.params.gost28147Params.data,
++	                lpk->u.gostR3410.params.gost28147Params.len); attrs++;
++	    }
++	    break;
+     default:
+ 	    PORT_SetError(SEC_ERROR_BAD_KEY);
+ 	    goto loser;
+     }
+     templateCount = attrs - theTemplate;
+     PORT_Assert(templateCount <= sizeof(theTemplate)/sizeof(CK_ATTRIBUTE));
+     PORT_Assert(signedattr != NULL);
+     signedcount = attrs - signedattr;
+@@ -505,16 +555,23 @@ PK11_ImportPrivateKeyInfoAndReturnKey(PK
+ 	    }
+ 	    prepare_dh_priv_key_export_for_asn1(lpk);
+ 	    keyTemplate = SECKEY_DHPrivateKeyExportTemplate;
+ 	    paramTemplate = NULL;
+ 	    paramDest = NULL;
+ 	    lpk->keyType = dhKey;
+ 	    keyType = CKK_DH;
+ 	    break;
++	case SEC_OID_GOSTR3410:
++	    keyTemplate = SECKEY_GOSTR3410PrivateKeyExportTemplate;
++	    paramTemplate = SECKEY_GOSTR3410ParamKeyTemplate;
++	    paramDest = &(lpk->u.gostR3410.params);
++	    lpk->keyType = gostR3410Key;
++	    keyType = CKK_GOSTR3410;
++	    break;
+ 
+ 	default:
+ 	    keyTemplate   = NULL;
+ 	    paramTemplate = NULL;
+ 	    paramDest     = NULL;
+ 	    break;
+     }
+ 
+diff --git a/security/nss/lib/pk11wrap/pk11pub.h b/security/nss/lib/pk11wrap/pk11pub.h
+--- a/security/nss/lib/pk11wrap/pk11pub.h
++++ b/security/nss/lib/pk11wrap/pk11pub.h
+@@ -288,21 +288,28 @@ SECStatus PK11_GenerateRandom(unsigned c
+ /* warning: cannot work with pkcs 5 v2
+  * use algorithm ID s instead of pkcs #11 mechanism pointers */
+ CK_RV PK11_MapPBEMechanismToCryptoMechanism(CK_MECHANISM_PTR pPBEMechanism,
+ 					    CK_MECHANISM_PTR pCryptoMechanism,
+ 					    SECItem *pbe_pwd, PRBool bad3DES);
+ CK_MECHANISM_TYPE PK11_GetPadMechanism(CK_MECHANISM_TYPE);
+ CK_MECHANISM_TYPE PK11_MapSignKeyType(KeyType keyType);
+ 
++SECStatus PK11_DecodeGOST28147AlgorithmIDParams(PRArenaPool *arena, SECItem *params,
++					    SECItem *keyParams, SECItem *ivec);
++
+ /**********************************************************************
+  *                   Symetric, Public, and Private Keys 
+  **********************************************************************/
+ void PK11_FreeSymKey(PK11SymKey *key);
+ PK11SymKey *PK11_ReferenceSymKey(PK11SymKey *symKey);
++PK11SymKey *PK11_ImportSymKeyWithTemplate(PK11SlotInfo *slot,
++                  CK_MECHANISM_TYPE type,
++                  PK11Origin origin, PRBool isToken, CK_ATTRIBUTE *keyTemplate,
++		  unsigned int templateCount, SECItem *key, void *wincx);
+ PK11SymKey *PK11_ImportSymKey(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
+     PK11Origin origin, CK_ATTRIBUTE_TYPE operation, SECItem *key, void *wincx);
+ PK11SymKey *PK11_ImportSymKeyWithFlags(PK11SlotInfo *slot, 
+     CK_MECHANISM_TYPE type, PK11Origin origin, CK_ATTRIBUTE_TYPE operation, 
+     SECItem *key, CK_FLAGS flags, PRBool isPerm, void *wincx);
+ PK11SymKey *PK11_SymKeyFromHandle(PK11SlotInfo *slot, PK11SymKey *parent,
+     PK11Origin origin, CK_MECHANISM_TYPE type, CK_OBJECT_HANDLE keyID, 
+     PRBool owner, void *wincx);
+@@ -382,16 +389,19 @@ void PK11_SetSymKeyUserData(PK11SymKey *
+  *
+  * If no data exists, or the data has been cleared, PK11_GetSymKeyUserData
+  * will return NULL. Returned data is still owned and managed by the SymKey,
+  * the caller should not free the data.
+  *
+  */
+ void *PK11_GetSymKeyUserData(PK11SymKey *symKey);
+ 
++SECStatus PK11_PubWrapSymKeyRaw(CK_MECHANISM_TYPE type, SECItem *params,
++				SECKEYPublicKey *pubKey,
++				PK11SymKey *symKey, SECItem *wrappedKey);
+ SECStatus PK11_PubWrapSymKey(CK_MECHANISM_TYPE type, SECKEYPublicKey *pubKey,
+ 				PK11SymKey *symKey, SECItem *wrappedKey);
+ SECStatus PK11_WrapSymKey(CK_MECHANISM_TYPE type, SECItem *params,
+ 	 PK11SymKey *wrappingKey, PK11SymKey *symKey, SECItem *wrappedKey);
+ /* move a key to 'slot' optionally set the key attributes according to either
+  * operation or the  flags and making the key permanent at the same time.
+  * If the key is moved to the same slot, operation and flags values are 
+  * currently ignored */
+@@ -460,16 +470,20 @@ PK11SymKey * PK11_UnwrapSymKeyWithFlagsP
+  *  PK11_PubUnwrap returns a key which can do exactly one operation, and is
+  * ephemeral (session key).
+  *  PK11_PubUnwrapWithFlagsPerm is the same as PK11_PubUnwrap except you can 
+  * use * CKF_ flags to enable more than one operation, and optionally make 
+  * the key permanent (token key).
+  */
+ PK11SymKey *PK11_PubUnwrapSymKey(SECKEYPrivateKey *key, SECItem *wrapppedKey,
+ 	 CK_MECHANISM_TYPE target, CK_ATTRIBUTE_TYPE operation, int keySize);
++PK11SymKey *PK11_PubUnwrapSymKeyWithTemplate(SECKEYPrivateKey *key,
++	 SECItem *wrapppedKey,
++	 CK_MECHANISM_TYPE target, CK_ATTRIBUTE_TYPE operation, int keySize,
++	 CK_ATTRIBUTE_PTR userTempl, CK_ULONG count);
+ PK11SymKey * PK11_PubUnwrapSymKeyWithFlagsPerm(SECKEYPrivateKey *wrappingKey, 
+ 	  SECItem *wrappedKey, CK_MECHANISM_TYPE target, 
+ 	  CK_ATTRIBUTE_TYPE operation, int keySize,
+ 	  CK_FLAGS flags, PRBool isPerm);
+ PK11SymKey *PK11_FindFixedKey(PK11SlotInfo *slot, CK_MECHANISM_TYPE type, 
+ 						SECItem *keyID, void *wincx);
+ SECStatus PK11_DeleteTokenPrivateKey(SECKEYPrivateKey *privKey,PRBool force);
+ SECStatus PK11_DeleteTokenPublicKey(SECKEYPublicKey *pubKey);
+diff --git a/security/nss/lib/pk11wrap/pk11skey.c b/security/nss/lib/pk11wrap/pk11skey.c
+--- a/security/nss/lib/pk11wrap/pk11skey.c
++++ b/security/nss/lib/pk11wrap/pk11skey.c
+@@ -423,18 +423,18 @@ PK11_SetWrapKey(PK11SlotInfo *slot, int 
+ PRBool
+ PK11_VerifyKeyOK(PK11SymKey *key) {
+     if (!PK11_IsPresent(key->slot)) {
+ 	return PR_FALSE;
+     }
+     return (PRBool)(key->series == key->slot->series);
+ }
+ 
+-static PK11SymKey *
+-pk11_ImportSymKeyWithTempl(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
++PK11SymKey *
++PK11_ImportSymKeyWithTemplate(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
+                   PK11Origin origin, PRBool isToken, CK_ATTRIBUTE *keyTemplate,
+ 		  unsigned int templateCount, SECItem *key, void *wincx)
+ {
+     PK11SymKey *    symKey;
+     SECStatus	    rv;
+ 
+     symKey = pk11_CreateSymKey(slot, type, !isToken, PR_TRUE, wincx);
+     if (symKey == NULL) {
+@@ -481,17 +481,17 @@ PK11_ImportSymKey(PK11SlotInfo *slot, CK
+ 
+     PK11_SETATTRS(attrs, CKA_CLASS, &keyClass, sizeof(keyClass) ); attrs++;
+     PK11_SETATTRS(attrs, CKA_KEY_TYPE, &keyType, sizeof(keyType) ); attrs++;
+     PK11_SETATTRS(attrs, operation, &cktrue, 1); attrs++;
+     templateCount = attrs - keyTemplate;
+     PR_ASSERT(templateCount+1 <= sizeof(keyTemplate)/sizeof(CK_ATTRIBUTE));
+ 
+     keyType = PK11_GetKeyType(type,key->len);
+-    symKey = pk11_ImportSymKeyWithTempl(slot, type, origin, PR_FALSE, 
++    symKey = PK11_ImportSymKeyWithTemplate(slot, type, origin, PR_FALSE, 
+ 				keyTemplate, templateCount, key, wincx);
+     return symKey;
+ }
+ 
+ 
+ /*
+  * turn key bits into an appropriate key object
+  */
+@@ -520,17 +520,17 @@ PK11_ImportSymKeyWithFlags(PK11SlotInfo 
+     if ((operation != CKA_FLAGS_ONLY) &&
+     	 !pk11_FindAttrInTemplate(keyTemplate, attrs-keyTemplate, operation)) {
+         PK11_SETATTRS(attrs, operation, &cktrue, sizeof(cktrue)); attrs++;
+     }
+     templateCount = attrs - keyTemplate;
+     PR_ASSERT(templateCount+1 <= sizeof(keyTemplate)/sizeof(CK_ATTRIBUTE));
+ 
+     keyType = PK11_GetKeyType(type,key->len);
+-    symKey = pk11_ImportSymKeyWithTempl(slot, type, origin, isPerm,
++    symKey = PK11_ImportSymKeyWithTemplate(slot, type, origin, isPerm,
+ 				 keyTemplate, templateCount, key, wincx);
+     if (symKey && isPerm) {
+ 	symKey->owner = PR_FALSE;
+     }
+     return symKey;
+ }
+ 
+ 
+@@ -879,16 +879,19 @@ PK11_MoveSymKey(PK11SlotInfo *slot, CK_A
+ 	   return PK11_ReferenceSymKey(symKey);
+ 	}
+     }
+     
+     return pk11_CopyToSlotPerm(slot, symKey->type, 
+ 					operation, flags, perm, symKey);
+ }
+ 
++static const unsigned char gost28147_default_params[] =
++        { 0x06, 0x07, 0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x01 };
++
+ /*
+  * Use the token to generate a key. 
+  * 
+  * keySize must be 'zero' for fixed key length algorithms. A nonzero 
+  *  keySize causes the CKA_VALUE_LEN attribute to be added to the template 
+  *  for the key. Most PKCS #11 modules fail if you specify the CKA_VALUE_LEN 
+  *  attribute for keys with fixed length. The exception is DES2. If you
+  *  select a CKM_DES3_CBC mechanism, this code will not add the CKA_VALUE_LEN
+@@ -940,16 +943,23 @@ pk11_TokenKeyGenWithFlagsAndKeyType(PK11
+ 							attrs++;
+     }
+ 
+     /* Include key id value if provided */
+     if (keyid) {
+         PK11_SETATTRS(attrs, CKA_ID, keyid->data, keyid->len); attrs++;
+     }
+ 
++    if (type == CKM_GOST28147 || type == CKM_GOST28147_MAC ||
++            type == CKM_GOST28147_ECB || type == CKM_GOST28147_KEY_WRAP ||
++	    keyType == CKK_GOST28147) {
++        PK11_SETATTRS(attrs, CKA_GOST28147PARAMS, gost28147_default_params,
++	        sizeof(gost28147_default_params)); attrs++;
++    }
++
+     attrs += pk11_AttrFlagsToAttributes(attrFlags, attrs, &cktrue, &ckfalse);
+     attrs += pk11_OpFlagsToAttributes(opFlags, attrs, &cktrue);
+ 
+     count = attrs - genTemplate;
+     PR_ASSERT(count <= sizeof(genTemplate)/sizeof(CK_ATTRIBUTE));
+ 
+     keyGenType = PK11_GetKeyGenWithSize(type, keySize);
+     if (keyGenType == CKM_FAKE_RANDOM) {
+@@ -998,17 +1008,17 @@ PK11_TokenKeyGenWithFlags(PK11SlotInfo *
+  */
+ PK11SymKey *
+ PK11_TokenKeyGen(PK11SlotInfo *slot, CK_MECHANISM_TYPE type, SECItem *param,
+     int keySize, SECItem *keyid, PRBool isToken, void *wincx)
+ {
+     PK11SymKey *symKey;
+     PRBool weird = PR_FALSE;   /* hack for fortezza */
+     CK_FLAGS opFlags = CKF_SIGN;
+-    PK11AttrFlags attrFlags = 0;
++    PK11AttrFlags attrFlags = PK11_ATTR_EXTRACTABLE;
+ 
+     if ((keySize == -1) && (type == CKM_SKIPJACK_CBC64)) {
+ 	weird = PR_TRUE;
+ 	keySize = 0;
+     }
+ 
+     opFlags |= weird ? CKF_DECRYPT : CKF_ENCRYPT;
+ 
+@@ -1175,24 +1185,33 @@ PK11_ConvertSessionSymKeyToTokenSymKey(P
+ /*
+  * This function does a straight public key wrap (which only RSA can do).
+  * Use PK11_PubGenKey and PK11_WrapSymKey to implement the FORTEZZA and
+  * Diffie-Hellman Ciphers. */
+ SECStatus
+ PK11_PubWrapSymKey(CK_MECHANISM_TYPE type, SECKEYPublicKey *pubKey,
+ 				PK11SymKey *symKey, SECItem *wrappedKey)
+ {
++    return PK11_PubWrapSymKeyRaw(type, NULL, pubKey, symKey, wrappedKey);
++}
++
++SECStatus
++PK11_PubWrapSymKeyRaw(CK_MECHANISM_TYPE type, SECItem *parameters,
++				SECKEYPublicKey *pubKey,
++				PK11SymKey *symKey, SECItem *wrappedKey)
++{
+     PK11SlotInfo *slot;
+     CK_ULONG len =  wrappedKey->len;
+     PK11SymKey *newKey = NULL;
+     CK_OBJECT_HANDLE id;
+     CK_MECHANISM mechanism;
+     PRBool owner = PR_TRUE;
+     CK_SESSION_HANDLE session;
+     CK_RV crv;
++    CK_GOSTR3410_KEY_WRAP_PARAMS gostR3410Params;
+ 
+     if (symKey == NULL) {
+ 	PORT_SetError( SEC_ERROR_INVALID_ARGS );
+ 	return SECFailure;
+     }
+ 
+     /* if this slot doesn't support the mechanism, go to a slot that does */
+     newKey = pk11_ForceSlot(symKey,type,CKA_ENCRYPT);
+@@ -1202,18 +1221,36 @@ PK11_PubWrapSymKey(CK_MECHANISM_TYPE typ
+ 
+     if (symKey->slot == NULL) {
+ 	PORT_SetError( SEC_ERROR_NO_MODULE );
+ 	return SECFailure;
+     }
+ 
+     slot = symKey->slot;
+     mechanism.mechanism = pk11_mapWrapKeyType(pubKey->keyType);
+-    mechanism.pParameter = NULL;
+-    mechanism.ulParameterLen = 0;
++    if (parameters) {
++        mechanism.pParameter = parameters->data;
++        mechanism.ulParameterLen = parameters->len;
++    } else {
++        switch (mechanism.mechanism) {
++        case CKM_GOSTR3410_KEY_WRAP:
++            mechanism.pParameter = &gostR3410Params;
++            mechanism.ulParameterLen = sizeof(gostR3410Params);
++            gostR3410Params.pWrapOID = gost28147_default_params;
++            gostR3410Params.ulWrapOIDLen = sizeof(gost28147_default_params);
++            gostR3410Params.pUKM = NULL;
++            gostR3410Params.ulUKMLen = 0;
++            gostR3410Params.hKey = CK_INVALID_HANDLE;
++            break;
++        default:
++            mechanism.pParameter = NULL;
++            mechanism.ulParameterLen = 0;
++            break;
++        }
++    }
+ 
+     id = PK11_ImportPublicKey(slot,pubKey,PR_FALSE);
+     if (id == CK_INVALID_HANDLE) {
+ 	if (newKey) {
+ 	    PK11_FreeSymKey(newKey);
+ 	}
+ 	return SECFailure;   /* Error code has been set. */
+     }
+@@ -1757,16 +1794,20 @@ PK11_PubDerive(SECKEYPrivateKey *privKey
+ 		SECITEM_FreeItem(pubValue,PR_TRUE);
+ 	    }
+ 
+ 	    PORT_ZFree(mechParams, sizeof(CK_ECDH1_DERIVE_PARAMS));
+ 
+ 	    if (crv == CKR_OK) return symKey;
+ 	    PORT_SetError( PK11_MapError(crv) );
+ 	}
++	break;
++    case gostR3410Key: /* not implemented yet */
++	PORT_SetError(SEC_ERROR_BAD_KEY);
++	break;
+    }
+ 
+    PK11_FreeSymKey(symKey);
+    return NULL;
+ }
+ 
+ static PK11SymKey *
+ pk11_PubDeriveECKeyWithKDF(
+@@ -1904,16 +1945,17 @@ PK11_PubDeriveWithKDF(SECKEYPrivateKey *
+ 
+     switch (privKey->keyType) {
+     case rsaKey:
+     case nullKey:
+     case dsaKey:
+     case keaKey:
+     case fortezzaKey:
+     case dhKey:
++    case gostR3410Key:
+ 	return PK11_PubDerive(privKey, pubKey, isSender, randomA, randomB,
+ 		derive, target, operation, keySize, wincx);
+     case ecKey:
+ 	return pk11_PubDeriveECKeyWithKDF( privKey, pubKey, isSender, 
+ 		randomA, randomB, derive, target, operation, keySize, 
+ 		kdf, sharedData, wincx);
+     default: break;
+     }
+@@ -1976,28 +2018,28 @@ pk11_HandUnwrap(PK11SlotInfo *slot, CK_O
+ 	if (crvp) *crvp =crv;
+ 	return NULL;
+     }
+ 
+     outKey.len = (key_size == 0) ? len : key_size;
+     outKey.type = siBuffer;
+ 
+     if (PK11_DoesMechanism(slot,target)) {
+-	symKey = pk11_ImportSymKeyWithTempl(slot, target, PK11_OriginUnwrap, 
++	symKey = PK11_ImportSymKeyWithTemplate(slot, target, PK11_OriginUnwrap, 
+ 	                                    isPerm, keyTemplate, 
+ 					    templateCount, &outKey, wincx);
+     } else {
+ 	slot = PK11_GetBestSlot(target,wincx);
+ 	if (slot == NULL) {
+ 	    PORT_SetError( SEC_ERROR_NO_MODULE );
+ 	    PORT_Free(outKey.data);
+ 	    if (crvp) *crvp = CKR_DEVICE_ERROR; 
+ 	    return NULL;
+ 	}
+-	symKey = pk11_ImportSymKeyWithTempl(slot, target, PK11_OriginUnwrap, 
++	symKey = PK11_ImportSymKeyWithTemplate(slot, target, PK11_OriginUnwrap, 
+ 	                                    isPerm, keyTemplate,
+ 					    templateCount, &outKey, wincx);
+ 	PK11_FreeSlot(slot);
+     }
+     PORT_Free(outKey.data);
+ 
+     if (crvp) *crvp = symKey? CKR_OK : CKR_DEVICE_ERROR; 
+     return symKey;
+@@ -2231,16 +2273,35 @@ PK11_PubUnwrapSymKey(SECKEYPrivateKey *w
+     
+     return pk11_AnyUnwrapKey(slot, wrappingKey->pkcs11ID,
+ 	wrapType, NULL, wrappedKey, target, operation, keySize, 
+ 	wrappingKey->wincx, NULL, 0, PR_FALSE);
+ }
+ 
+ /* unwrap a symetric key with a private key. */
+ PK11SymKey *
++PK11_PubUnwrapSymKeyWithTemplate(SECKEYPrivateKey *wrappingKey,
++	  SECItem *wrappedKey,
++	  CK_MECHANISM_TYPE target, CK_ATTRIBUTE_TYPE operation, int keySize,
++	  CK_ATTRIBUTE_PTR userTempl, CK_ULONG count)
++{
++    CK_MECHANISM_TYPE wrapType = pk11_mapWrapKeyType(wrappingKey->keyType);
++    PK11SlotInfo    *slot = wrappingKey->pkcs11Slot;
++
++    if (SECKEY_HAS_ATTRIBUTE_SET(wrappingKey,CKA_PRIVATE)) {
++	PK11_HandlePasswordCheck(slot,wrappingKey->wincx);
++    }
++    
++    return pk11_AnyUnwrapKey(slot, wrappingKey->pkcs11ID,
++	wrapType, NULL, wrappedKey, target, operation, keySize, 
++	wrappingKey->wincx, userTempl, count, PR_FALSE);
++}
++
++/* unwrap a symetric key with a private key. */
++PK11SymKey *
+ PK11_PubUnwrapSymKeyWithFlags(SECKEYPrivateKey *wrappingKey, 
+ 	  SECItem *wrappedKey, CK_MECHANISM_TYPE target, 
+ 	  CK_ATTRIBUTE_TYPE operation, int keySize, CK_FLAGS flags)
+ {
+     CK_MECHANISM_TYPE wrapType = pk11_mapWrapKeyType(wrappingKey->keyType);
+     CK_BBOOL        ckTrue	= CK_TRUE; 
+     CK_ATTRIBUTE    keyTemplate[MAX_TEMPL_ATTRS];
+     unsigned int    templateCount;
+diff --git a/security/nss/lib/pk11wrap/pk11slot.c b/security/nss/lib/pk11wrap/pk11slot.c
+--- a/security/nss/lib/pk11wrap/pk11slot.c
++++ b/security/nss/lib/pk11wrap/pk11slot.c
+@@ -76,16 +76,17 @@ PK11DefaultArrayEntry PK11_DefaultArray[
+ 	{ "SHA256", SECMOD_SHA256_FLAG, CKM_SHA256 },
+ /*	{ "SHA384", SECMOD_SHA512_FLAG, CKM_SHA384 }, */
+ 	{ "SHA512", SECMOD_SHA512_FLAG, CKM_SHA512 },
+ 	{ "MD5", SECMOD_MD5_FLAG, CKM_MD5 },
+ 	{ "MD2", SECMOD_MD2_FLAG, CKM_MD2 },
+ 	{ "SSL", SECMOD_SSL_FLAG, CKM_SSL3_PRE_MASTER_KEY_GEN },
+ 	{ "TLS", SECMOD_TLS_FLAG, CKM_TLS_MASTER_KEY_DERIVE },
+ 	{ "SKIPJACK", SECMOD_FORTEZZA_FLAG, CKM_SKIPJACK_CBC64 },
++	{ "GOST", SECMOD_GOST_FLAG, CKM_GOSTR3410 },
+ 	{ "Publicly-readable certs", SECMOD_FRIENDLY_FLAG, CKM_INVALID_MECHANISM },
+ 	{ "Random Num Generator", SECMOD_RANDOM_FLAG, CKM_FAKE_RANDOM },
+ };
+ const int num_pk11_default_mechanisms = 
+                 sizeof(PK11_DefaultArray) / sizeof(PK11_DefaultArray[0]);
+ 
+ PK11DefaultArrayEntry *
+ PK11_GetDefaultArray(int *size)
+@@ -114,16 +115,17 @@ static PK11SlotList
+     pk11_rsaSlotList,
+     pk11_dsaSlotList,
+     pk11_dhSlotList,
+     pk11_ecSlotList,
+     pk11_ideaSlotList,
+     pk11_sslSlotList,
+     pk11_tlsSlotList,
+     pk11_randomSlotList,
++    pk11_gostSlotList,
+     pk11_sha256SlotList,
+     pk11_sha512SlotList;	/* slots do SHA512 and SHA384 */
+ 
+ /************************************************************
+  * Generic Slot List and Slot List element manipulations
+  ************************************************************/
+ 
+ /*
+@@ -791,16 +793,17 @@ PK11_InitSlotLists(void)
+     pk11_InitSlotListStatic(&pk11_rsaSlotList);
+     pk11_InitSlotListStatic(&pk11_dsaSlotList);
+     pk11_InitSlotListStatic(&pk11_dhSlotList);
+     pk11_InitSlotListStatic(&pk11_ecSlotList);
+     pk11_InitSlotListStatic(&pk11_ideaSlotList);
+     pk11_InitSlotListStatic(&pk11_sslSlotList);
+     pk11_InitSlotListStatic(&pk11_tlsSlotList);
+     pk11_InitSlotListStatic(&pk11_randomSlotList);
++    pk11_InitSlotListStatic(&pk11_gostSlotList);
+     pk11_InitSlotListStatic(&pk11_sha256SlotList);
+     pk11_InitSlotListStatic(&pk11_sha512SlotList);
+     return SECSuccess;
+ }
+ 
+ void
+ PK11_DestroySlotLists(void)
+ {
+@@ -817,16 +820,17 @@ PK11_DestroySlotLists(void)
+     pk11_FreeSlotListStatic(&pk11_rsaSlotList);
+     pk11_FreeSlotListStatic(&pk11_dsaSlotList);
+     pk11_FreeSlotListStatic(&pk11_dhSlotList);
+     pk11_FreeSlotListStatic(&pk11_ecSlotList);
+     pk11_FreeSlotListStatic(&pk11_ideaSlotList);
+     pk11_FreeSlotListStatic(&pk11_sslSlotList);
+     pk11_FreeSlotListStatic(&pk11_tlsSlotList);
+     pk11_FreeSlotListStatic(&pk11_randomSlotList);
++    pk11_FreeSlotListStatic(&pk11_gostSlotList);
+     pk11_FreeSlotListStatic(&pk11_sha256SlotList);
+     pk11_FreeSlotListStatic(&pk11_sha512SlotList);
+     return;
+ }
+ 
+ /* return a system slot list based on mechanism */
+ PK11SlotList *
+ PK11_GetSlotList(CK_MECHANISM_TYPE type)
+@@ -889,16 +893,28 @@ PK11_GetSlotList(CK_MECHANISM_TYPE type)
+     case CKM_SSL3_MD5_MAC:
+ 	return &pk11_sslSlotList;
+     case CKM_TLS_MASTER_KEY_DERIVE:
+     case CKM_TLS_KEY_AND_MAC_DERIVE:
+ 	return &pk11_tlsSlotList;
+     case CKM_IDEA_CBC:
+     case CKM_IDEA_ECB:
+ 	return &pk11_ideaSlotList;
++    case CKM_GOST28147_ECB:
++    case CKM_GOST28147:
++    case CKM_GOST28147_MAC:
++    case CKM_GOST28147_KEY_WRAP:
++    case CKM_GOSTR3411:
++    case CKM_GOSTR3411_HMAC:
++    case CKM_GOSTR3410_KEY_PAIR_GEN:
++    case CKM_GOSTR3410:
++    case CKM_GOSTR3410_WITH_GOSTR3411:
++    case CKM_GOSTR3410_KEY_WRAP:
++    case CKM_GOSTR3410_DERIVE:
++	return &pk11_gostSlotList;
+     case CKM_FAKE_RANDOM:
+ 	return &pk11_randomSlotList;
+     }
+     return NULL;
+ }
+ 
+ /*
+  * load the static SlotInfo structures used to select a PKCS11 slot.
+@@ -1986,16 +2002,17 @@ PK11_GetBestSlotMultiple(CK_MECHANISM_TY
+     }
+ 
+     PORT_SetError(0);
+ 
+ 
+     listNeedLogin = PR_FALSE;
+     for (i=0; i < mech_count; i++) {
+ 	if ((type[i] != CKM_FAKE_RANDOM) && 
++	    (type[i] != CKM_GOSTR3411) &&
+ 	    (type[i] != CKM_SHA_1) &&
+ 	    (type[i] != CKM_SHA256) &&
+ 	    (type[i] != CKM_SHA384) &&
+ 	    (type[i] != CKM_SHA512) &&
+ 	    (type[i] != CKM_MD5) && 
+ 	    (type[i] != CKM_MD2)) {
+ 	    listNeedLogin = PR_TRUE;
+ 	    break;
+diff --git a/security/nss/lib/pk11wrap/secmod.h b/security/nss/lib/pk11wrap/secmod.h
+--- a/security/nss/lib/pk11wrap/secmod.h
++++ b/security/nss/lib/pk11wrap/secmod.h
+@@ -55,16 +55,17 @@
+ #define PUBLIC_MECH_MD2_FLAG         0x00000400ul
+ #define PUBLIC_MECH_SSL_FLAG         0x00000800ul
+ #define PUBLIC_MECH_TLS_FLAG         0x00001000ul
+ #define PUBLIC_MECH_AES_FLAG         0x00002000ul
+ #define PUBLIC_MECH_SHA256_FLAG      0x00004000ul
+ #define PUBLIC_MECH_SHA512_FLAG      0x00008000ul
+ #define PUBLIC_MECH_CAMELLIA_FLAG    0x00010000ul
+ #define PUBLIC_MECH_SEED_FLAG        0x00020000ul
++#define PUBLIC_MECH_GOST_FLAG        0x00040000ul
+ 
+ #define PUBLIC_MECH_RANDOM_FLAG      0x08000000ul
+ #define PUBLIC_MECH_FRIENDLY_FLAG    0x10000000ul
+ #define PUBLIC_OWN_PW_DEFAULTS       0X20000000ul
+ #define PUBLIC_DISABLE_FLAG          0x40000000ul
+ 
+ /* warning: reserved means reserved */
+ #define PUBLIC_MECH_RESERVED_FLAGS   0x87FF0000ul
+diff --git a/security/nss/lib/pkcs12/p12d.c b/security/nss/lib/pkcs12/p12d.c
+--- a/security/nss/lib/pkcs12/p12d.c
++++ b/security/nss/lib/pkcs12/p12d.c
+@@ -182,16 +182,23 @@ struct SEC_PKCS12DecoderContextStr {
+  */
+ static SECStatus
+ sec_pkcs12_decoder_begin_nested_safe_contents(sec_PKCS12SafeContentsContext 
+ 							*safeContentsCtx);
+ static SECStatus
+ sec_pkcs12_decoder_finish_nested_safe_contents(sec_PKCS12SafeContentsContext
+ 							*safeContentsCtx);
+ 
++static SECKEYPublicKey *
++sec_pkcs12_get_public_key_and_usage(sec_PKCS12SafeBag *certBag,
++					 unsigned int *usage);
++
++static SECItem *
++sec_pkcs12_get_public_value_and_type(SECKEYPublicKey *pubKey,
++					KeyType *type);
+ 
+ /* make sure that the PFX version being decoded is a version
+  * which we support.
+  */
+ static PRBool
+ sec_pkcs12_proper_version(sec_PKCS12PFXItem *pfx)
+ {
+     /* if no version, assume it is not supported */
+@@ -1369,28 +1376,72 @@ sec_pkcs12_decoder_verify_mac(SEC_PKCS12
+     } else {
+ 	iteration = 1;
+     }
+ 
+     params = PK11_CreatePBEParams(&p12dcx->macData.macSalt, p12dcx->pwitem,
+                                   iteration);
+ 
+     algtag = SECOID_GetAlgorithmTag(&p12dcx->macData.safeMac.digestAlgorithm);
++    if (algtag == SEC_OID_GOSTR3411) {
++      /*
++       * make the key manually, there's no suitable mechanism for this,
++       * and, most probably, will never be.
++       */
++      int i, n, Slen, Plen;
++      unsigned char A[32];
++      PK11SlotInfo *slot = NULL;
++  
++      PORT_Memset(A, 3, sizeof(A));
++      Slen = ((p12dcx->macData.macSalt.len + 31) / 32) * 32;
++      Plen = p12dcx->pwitem ? ((p12dcx->pwitem->len + 31) / 32) * 32 : 0;
++      pk11cx = PK11_CreateDigestContext(SEC_OID_GOSTR3411);
++      if (!pk11cx) goto loser;
++      lrv = 0;
++      for (n = 0; n < iteration; n++) {
++        lrv |= PK11_DigestBegin(pk11cx);
++        if (n) {
++          lrv |= PK11_DigestOp(pk11cx, A, 32);
++        } else {
++          lrv |= PK11_DigestOp(pk11cx, A, sizeof(A));
++          for (i = 0; i < Slen; i += p12dcx->macData.macSalt.len)
++            lrv |= PK11_DigestOp(pk11cx, p12dcx->macData.macSalt.data,
++	            (Slen - i > p12dcx->macData.macSalt.len) ?
++		    p12dcx->macData.macSalt.len : Slen - i);
++          for (i = 0; i < Plen; i += p12dcx->pwitem->len)
++            lrv |= PK11_DigestOp(pk11cx, p12dcx->pwitem->data,
++	            (Plen - i > p12dcx->pwitem->len) ?
++		    p12dcx->pwitem->len : Plen - i);
++        }
++        lrv |= PK11_DigestFinal(pk11cx, A, &bufLen, sizeof(A));
++      }
++      PK11_DestroyContext(pk11cx, PR_TRUE);
++      if (lrv != SECSuccess) goto loser;
++      hmacRes.data = A;
++      hmacRes.len = sizeof(A);
++      slot = PK11_GetBestSlot(CKM_GOSTR3411_HMAC, NULL);
++      if (!slot) goto loser;
++      symKey = PK11_ImportSymKey(slot, CKM_GOSTR3411_HMAC, PK11_OriginDerive,
++              CKA_SIGN, &hmacRes, NULL);
++      PORT_Memset(A, 0, sizeof(A));
++      PK11_FreeSlot(slot);
++    } else {
+     switch (algtag) {
+     case SEC_OID_SHA1:
+ 	integrityMech = CKM_NETSCAPE_PBE_SHA1_HMAC_KEY_GEN; break;
+     case SEC_OID_MD5:
+ 	integrityMech = CKM_NETSCAPE_PBE_MD5_HMAC_KEY_GEN;  break;
+     case SEC_OID_MD2:
+ 	integrityMech = CKM_NETSCAPE_PBE_MD2_HMAC_KEY_GEN;  break;
+     default:
+ 	goto loser;
+     }
+ 
+     symKey = PK11_KeyGen(NULL, integrityMech, params, 20, NULL);
++    }
+     PK11_DestroyPBEParams(params);
+     params = NULL;
+     if (!symKey) goto loser;
+     /* init hmac */
+     pk11cx = PK11_CreateContextBySymKey(sec_pkcs12_algtag_to_mech(algtag),
+                                         CKA_SIGN, symKey, &ignore);
+     if(!pk11cx) {
+ 	goto loser;
+@@ -2747,16 +2798,41 @@ sec_pkcs12_validate_bags(sec_PKCS12SafeB
+ 			cert->problem = PR_TRUE;
+ 			cert->error   = key->error;
+ 			continue;
+ 		    } 
+ 		    sec_pkcs12_validate_cert(cert, key, nicknameCb, wincx);
+ 		    if(cert->problem) {
+ 			key->problem = cert->problem;
+ 			key->error   = cert->error;
++		    } else if (PK11_IsInternal(key->slot)) {
++		      /* validate default slot for the key/cert pair */
++		      unsigned int usage = 0;
++		      KeyType pubKeyType;
++		      CK_MECHANISM_TYPE mech;
++		      PK11SlotInfo *slot;
++		      SECKEYPublicKey *pubKey =
++		          sec_pkcs12_get_public_key_and_usage(cert, &usage);
++		      if (pubKey &&
++		          sec_pkcs12_get_public_value_and_type(pubKey, &pubKeyType)) {
++		        mech = PK11_MapSignKeyType(pubKeyType);
++		        if (mech != CKM_INVALID_MECHANISM &&
++			    !PK11_DoesMechanism(cert->slot, mech)) {
++		          slot = PK11_GetBestSlot(mech, wincx);
++		          if (slot) {
++		            /* XXX free key->slot & cert->slot when the bag is freed */
++		            key->slot = PK11_ReferenceSlot(slot);
++		            key->slotFree = PR_TRUE;
++		            cert->slot = PK11_ReferenceSlot(slot);
++		            cert->slotFree = PR_TRUE;
++		            PK11_FreeSlot(slot);
++		          }
++		        }
++		      }
++		      if (pubKey) SECKEY_DestroyPublicKey(pubKey);
+ 		    }
+ 		}
+ 	    }
+ 	}
+     }
+ 
+     /* Now take a second pass over the safebags and mark for installation any 
+      * certs that were neither installed nor disqualified by the first pass.
+@@ -2879,16 +2955,19 @@ sec_pkcs12_get_public_value_and_type(SEC
+ 	    pubValue = &pubKey->u.dh.publicValue;
+ 	    break;
+ 	case rsaKey:
+ 	    pubValue = &pubKey->u.rsa.modulus;
+ 	    break;
+         case ecKey:
+ 	    pubValue = &pubKey->u.ec.publicValue;
+ 	    break;
++	case gostR3410Key:
++	    pubValue = &pubKey->u.gostR3410.publicValue;
++	    break;
+ 	default:
+ 	    pubValue = NULL;
+     }
+ 
+     return pubValue;
+ }
+ 
+ /* This function takes two passes over the bags, installing them in the
+diff --git a/security/nss/lib/pkcs12/p12local.c b/security/nss/lib/pkcs12/p12local.c
+--- a/security/nss/lib/pkcs12/p12local.c
++++ b/security/nss/lib/pkcs12/p12local.c
+@@ -63,16 +63,18 @@ sec_pkcs12_algtag_to_mech(SECOidTag algt
+     case SEC_OID_SHA1:
+ 	return CKM_SHA_1_HMAC;
+     case SEC_OID_SHA256:
+ 	return CKM_SHA256_HMAC;
+     case SEC_OID_SHA384:
+ 	return CKM_SHA384_HMAC;
+     case SEC_OID_SHA512:
+ 	return CKM_SHA512_HMAC;
++    case SEC_OID_GOSTR3411:
++	return CKM_GOSTR3411_HMAC;
+     default:
+ 	break;
+     }
+     return CKM_INVALID_MECHANISM;
+ }
+ 
+ /* helper functions */
+ /* returns proper bag type template based upon object type tag */
+diff --git a/security/nss/lib/pkcs12/p12plcy.c b/security/nss/lib/pkcs12/p12plcy.c
+--- a/security/nss/lib/pkcs12/p12plcy.c
++++ b/security/nss/lib/pkcs12/p12plcy.c
+@@ -52,16 +52,17 @@ typedef struct pkcs12SuiteMapStr {
+ 
+ static pkcs12SuiteMap pkcs12SuiteMaps[] = {
+     { SEC_OID_RC4,		40,	PKCS12_RC4_40,		PR_FALSE,	PR_FALSE},
+     { SEC_OID_RC4,	       128,	PKCS12_RC4_128,		PR_FALSE,	PR_FALSE},
+     { SEC_OID_RC2_CBC,		40,	PKCS12_RC2_CBC_40,	PR_FALSE,	PR_TRUE},
+     { SEC_OID_RC2_CBC,	       128,	PKCS12_RC2_CBC_128,	PR_FALSE,	PR_FALSE},
+     { SEC_OID_DES_CBC,		64,	PKCS12_DES_56,		PR_FALSE,	PR_FALSE},
+     { SEC_OID_DES_EDE3_CBC,    192,	PKCS12_DES_EDE3_168,	PR_FALSE,	PR_FALSE},
++    { SEC_OID_GOST28147,        0,	PKCS12_GOST, 		PR_FALSE,	PR_FALSE},
+     { SEC_OID_UNKNOWN,		 0,	PKCS12_NULL,		PR_FALSE,	PR_FALSE},
+     { SEC_OID_UNKNOWN,		 0,	0L,			PR_FALSE,	PR_FALSE}
+ };
+ 
+ /* determine if algid is an algorithm which is allowed */
+ PRBool 
+ SEC_PKCS12DecryptionAllowed(SECAlgorithmID *algid)
+ {
+@@ -74,17 +75,18 @@ SEC_PKCS12DecryptionAllowed(SECAlgorithm
+ 	return PR_FALSE;
+     }
+     
+     keyLengthBits = (unsigned int)(SEC_PKCS5GetKeyLength(algid) * 8);
+ 
+     i = 0;
+     while(pkcs12SuiteMaps[i].algTag != SEC_OID_UNKNOWN) {
+ 	if((pkcs12SuiteMaps[i].algTag == algId) && 
+-	   (pkcs12SuiteMaps[i].keyLengthBits == keyLengthBits)) {
++	   (!pkcs12SuiteMaps[i].keyLengthBits ||
++	   (pkcs12SuiteMaps[i].keyLengthBits == keyLengthBits))) {
+ 
+ 	    return pkcs12SuiteMaps[i].allowed;
+ 	}
+ 	i++;
+     }
+ 
+     return PR_FALSE;
+ }
+diff --git a/security/nss/lib/pkcs12/p12t.h b/security/nss/lib/pkcs12/p12t.h
+--- a/security/nss/lib/pkcs12/p12t.h
++++ b/security/nss/lib/pkcs12/p12t.h
+@@ -115,16 +115,17 @@ struct sec_PKCS12SafeBagStr {
+     unsigned int nAttribs;
+ 
+     /* used for validation/importing */
+     PRBool problem, noInstall, validated, hasKey, unused, installed;
+     int error;
+ 
+     PRBool swapUnicodeBytes;
+     PK11SlotInfo *slot;
++    PRBool slotFree;
+     SECItem *pwitem;
+     PRBool oldBagType;
+     SECPKCS12TargetTokenCAs tokenCAs;
+ };
+     
+ struct sec_PKCS12SafeContentsStr {
+     sec_PKCS12SafeBag **safeBags;
+     SECItem **encodedSafeBags;
+diff --git a/security/nss/lib/pkcs7/p7decode.c b/security/nss/lib/pkcs7/p7decode.c
+--- a/security/nss/lib/pkcs7/p7decode.c
++++ b/security/nss/lib/pkcs7/p7decode.c
+@@ -437,16 +437,18 @@ sec_pkcs7_decoder_get_recipient_key (SEC
+ {
+     SEC_PKCS7RecipientInfo *ri;
+     CERTCertificate *cert = NULL;
+     SECKEYPrivateKey *privkey = NULL;
+     PK11SymKey *bulkkey = NULL;
+     SECOidTag keyalgtag, bulkalgtag, encalgtag;
+     PK11SlotInfo *slot = NULL;
+     int bulkLength = 0;
++    SECItem keyParam;
++    CK_ATTRIBUTE attr;
+ 
+     if (recipientinfos == NULL || recipientinfos[0] == NULL) {
+ 	p7dcx->error = SEC_ERROR_NOT_A_RECIPIENT;
+ 	goto no_key_found;
+     }
+ 
+     cert = PK11_FindCertAndKeyByRecipientList(&slot,recipientinfos,&ri,
+ 						&privkey, p7dcx->pwfn_arg);
+@@ -583,16 +585,38 @@ sec_pkcs7_decoder_get_recipient_key (SEC
+ 	      if (bulkkey == NULL)
+ 	      {
+ 		  p7dcx->error = PORT_GetError();
+ 		  PORT_SetError(0);
+ 		  goto no_key_found;
+ 	      }
+ 	      break;
+ 	  }
++	break;
++      case SEC_OID_GOSTR3410:
++	if (PK11_AlgtagToMechanism(bulkalgtag) != CKM_GOST28147) {
++	    p7dcx->error = SEC_ERROR_INVALID_ALGORITHM;
++	    break;
++	}
++	if (PK11_DecodeGOST28147AlgorithmIDParams(p7dcx->tmp_poolp,
++	        &(enccinfo->contentEncAlg.parameters),
++		&keyParam, NULL) != SECSuccess) {
++	    p7dcx->error = SEC_ERROR_INVALID_ALGORITHM;
++	    break;
++	}
++	attr.type = CKA_GOST28147PARAMS;
++	attr.pValue = keyParam.data;
++	attr.ulValueLen = keyParam.len;
++	bulkkey = PK11_PubUnwrapSymKeyWithTemplate(privkey, &ri->encKey,
++					CKM_GOST28147, CKA_DECRYPT, 0, &attr, 1);
++	if (bulkkey == NULL) {
++	    p7dcx->error = PORT_GetError();
++	    PORT_SetError(0);
++	}
++	break;
+       default:
+ 	p7dcx->error = SEC_ERROR_UNSUPPORTED_KEYALG;
+ 	break;
+     }
+ 
+ no_key_found:
+     if (privkey != NULL)
+ 	SECKEY_DestroyPrivateKey (privkey);
+diff --git a/security/nss/lib/pkcs7/p7encode.c b/security/nss/lib/pkcs7/p7encode.c
+--- a/security/nss/lib/pkcs7/p7encode.c
++++ b/security/nss/lib/pkcs7/p7encode.c
+@@ -200,21 +200,24 @@ sec_pkcs7_encoder_start_encrypt (SEC_PKC
+ 	 * of the following hardwired RSA and KEA stuff should be done
+ 	 * elsewhere.
+ 	 */
+ 
+ 	certalgtag=SECOID_GetAlgorithmTag(&(cert->subjectPublicKeyInfo.algorithm));
+ 
+ 	switch (certalgtag) {
+ 	case SEC_OID_PKCS1_RSA_ENCRYPTION:
++	case SEC_OID_GOSTR3410:
+ 	    encalgtag = certalgtag;
+ 	    publickey = CERT_ExtractPublicKey (cert);
+ 	    if (publickey == NULL) goto loser;
+ 		
+ 	    data_len = SECKEY_PublicKeyStrength(publickey);
++	    if (certalgtag == SEC_OID_GOSTR3410)
++	        data_len = 1024; /* should be enough */
+ 	    ri->encKey.data = 
+ 	        (unsigned char*)PORT_ArenaAlloc(cinfo->poolp ,data_len);
+ 	    ri->encKey.len = data_len;
+ 	    if (ri->encKey.data == NULL) goto loser;
+ 
+ 	    rv = PK11_PubWrapSymKey(PK11_AlgtagToMechanism(certalgtag),publickey,
+ 				bulkkey,&ri->encKey);
+ 
+diff --git a/security/nss/lib/smime/cms.h b/security/nss/lib/smime/cms.h
+--- a/security/nss/lib/smime/cms.h
++++ b/security/nss/lib/smime/cms.h
+@@ -906,17 +906,18 @@ SECStatus NSS_CMSRecipientInfo_Encode(PL
+ extern SECOidTag
+ NSS_CMSRecipientInfo_GetKeyEncryptionAlgorithmTag(NSSCMSRecipientInfo *ri);
+ 
+ extern SECStatus
+ NSS_CMSRecipientInfo_WrapBulkKey(NSSCMSRecipientInfo *ri, PK11SymKey *bulkkey, SECOidTag bulkalgtag);
+ 
+ extern PK11SymKey *
+ NSS_CMSRecipientInfo_UnwrapBulkKey(NSSCMSRecipientInfo *ri, int subIndex,
+-		CERTCertificate *cert, SECKEYPrivateKey *privkey, SECOidTag bulkalgtag);
++		CERTCertificate *cert, SECKEYPrivateKey *privkey, SECOidTag bulkalgtag,
++		NSSCMSContentInfo *cinfo, PLArenaPool *arena);
+ 
+ /************************************************************************
+  * cmsencdata.c - CMS encryptedData methods
+  ************************************************************************/
+ /*
+  * NSS_CMSEncryptedData_Create - create an empty encryptedData object.
+  *
+  * "algorithm" specifies the bulk encryption algorithm to use.
+diff --git a/security/nss/lib/smime/cmsenvdata.c b/security/nss/lib/smime/cmsenvdata.c
+--- a/security/nss/lib/smime/cmsenvdata.c
++++ b/security/nss/lib/smime/cmsenvdata.c
+@@ -365,17 +365,18 @@ NSS_CMSEnvelopedData_Decode_BeforeData(N
+     bulkalgtag = NSS_CMSContentInfo_GetContentEncAlgTag(cinfo);
+     if (bulkalgtag == SEC_OID_UNKNOWN) {
+ 	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+     } else 
+ 	bulkkey = 
+ 	    NSS_CMSRecipientInfo_UnwrapBulkKey(ri,recipient->subIndex,
+ 						    recipient->cert,
+ 						    recipient->privkey,
+-						    bulkalgtag);
++						    bulkalgtag,
++						    cinfo, envd->cmsg->poolp);
+     if (bulkkey == NULL) {
+ 	/* no success finding a bulk key */
+ 	goto loser;
+     }
+ 
+     NSS_CMSContentInfo_SetBulkKey(cinfo, bulkkey);
+ 
+     bulkalg = NSS_CMSContentInfo_GetContentEncAlg(cinfo);
+diff --git a/security/nss/lib/smime/cmslocal.h b/security/nss/lib/smime/cmslocal.h
+--- a/security/nss/lib/smime/cmslocal.h
++++ b/security/nss/lib/smime/cmslocal.h
+@@ -195,16 +195,25 @@ extern SECStatus
+ NSS_CMSUtil_EncryptSymKey_ESDH(PLArenaPool *poolp, CERTCertificate *cert, PK11SymKey *key,
+ 			SECItem *encKey, SECItem **ukm, SECAlgorithmID *keyEncAlg,
+ 			SECItem *originatorPubKey);
+ 
+ extern PK11SymKey *
+ NSS_CMSUtil_DecryptSymKey_ESDH(SECKEYPrivateKey *privkey, SECItem *encKey,
+ 			SECAlgorithmID *keyEncAlg, SECOidTag bulkalgtag, void *pwfn_arg);
+ 
++extern SECStatus
++NSS_CMSUtil_EncryptSymKey_GOSTR3410(PLArenaPool *poolp, CERTCertificate *cert,
++                              PK11SymKey *key,
++                              SECItem *encKey);
++
++extern PK11SymKey *
++NSS_CMSUtil_DecryptSymKey_GOSTR3410(SECKEYPrivateKey *privkey, SECItem *encKey,
++			SECOidTag bulkalgtag, SECItem *keyParam);
++
+ /************************************************************************
+  * cmsreclist.c - recipient list stuff
+  ************************************************************************/
+ extern NSSCMSRecipient **nss_cms_recipient_list_create(NSSCMSRecipientInfo **recipientinfos);
+ extern void nss_cms_recipient_list_destroy(NSSCMSRecipient **recipient_list);
+ extern NSSCMSRecipientEncryptedKey *NSS_CMSRecipientEncryptedKey_Create(PLArenaPool *poolp);
+ 
+ /************************************************************************
+diff --git a/security/nss/lib/smime/cmspubkey.c b/security/nss/lib/smime/cmspubkey.c
+--- a/security/nss/lib/smime/cmspubkey.c
++++ b/security/nss/lib/smime/cmspubkey.c
+@@ -558,8 +558,84 @@ NSS_CMSUtil_DecryptSymKey_ESDH(SECKEYPri
+ 
+     return bulkkey;
+ 
+ loser:
+ #endif
+     return NULL;
+ }
+ 
++/* ===== GOST R34.10-2001 =================================================== */
++
++SECStatus
++NSS_CMSUtil_EncryptSymKey_GOSTR3410(PLArenaPool *poolp, CERTCertificate *cert, 
++                              PK11SymKey *bulkkey,
++                              SECItem *encKey)
++{
++    SECStatus rv;
++    SECKEYPublicKey *publickey;
++    int data_len;
++    KeyType keyType;
++    void *mark = NULL;
++
++    publickey = CERT_ExtractPublicKey(cert);
++    if (publickey == NULL)
++	return SECFailure;
++
++    mark = PORT_ArenaMark(poolp);
++    if (!mark)
++	goto loser;
++
++    /* sanity check */
++    keyType = SECKEY_GetPublicKeyType(publickey);
++    PORT_Assert(keyType == gostR3410Key);
++    if (keyType != gostR3410Key) {
++	goto loser;
++    }
++    /* allocate memory for the encrypted key */
++    data_len = 1024; /* should be enough */
++    encKey->data = (unsigned char*)PORT_ArenaAlloc(poolp, data_len);
++    encKey->len = data_len;
++    if (encKey->data == NULL)
++	goto loser;
++
++    /* encrypt the key now */
++    rv = PK11_PubWrapSymKey(CKM_GOSTR3410_KEY_WRAP,
++				publickey, bulkkey, encKey);
++
++    if (rv != SECSuccess)
++	goto loser;
++
++    PORT_ArenaUnmark(poolp, mark);
++    SECKEY_DestroyPublicKey(publickey);
++    return SECSuccess;
++
++loser:
++    if (mark) {
++	PORT_ArenaRelease(poolp, mark);
++    }
++    SECKEY_DestroyPublicKey(publickey);
++    return SECFailure;
++}
++
++PK11SymKey *
++NSS_CMSUtil_DecryptSymKey_GOSTR3410(SECKEYPrivateKey *privkey, SECItem *encKey,
++        SECOidTag bulkalgtag, SECItem *keyParam)
++{
++    CK_MECHANISM_TYPE target;
++    CK_ATTRIBUTE keyAttr;
++
++    PORT_Assert(bulkalgtag != SEC_OID_UNKNOWN);
++
++    target = PK11_AlgtagToMechanism(bulkalgtag);
++    if (bulkalgtag != SEC_OID_GOST28147 || target != CKM_GOST28147) {
++	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
++	return NULL;
++    }
++
++    keyAttr.type = CKA_GOST28147PARAMS;
++    keyAttr.pValue = keyParam->data;
++    keyAttr.ulValueLen = keyParam->len;
++
++    return PK11_PubUnwrapSymKeyWithTemplate(privkey, encKey, target,
++            CKA_DECRYPT, 0, &keyAttr, 1);
++}
++
+diff --git a/security/nss/lib/smime/cmsrecinfo.c b/security/nss/lib/smime/cmsrecinfo.c
+--- a/security/nss/lib/smime/cmsrecinfo.c
++++ b/security/nss/lib/smime/cmsrecinfo.c
+@@ -151,16 +151,17 @@ nss_cmsrecipientinfo_create(NSSCMSMessag
+             break;
+     }
+ 
+     certalgtag = SECOID_GetAlgorithmTag(&(spki->algorithm));
+ 
+     rid = &ri->ri.keyTransRecipientInfo.recipientIdentifier;
+     switch (certalgtag) {
+     case SEC_OID_PKCS1_RSA_ENCRYPTION:
++    case SEC_OID_GOSTR3410:
+ 	ri->recipientInfoType = NSSCMSRecipientInfoID_KeyTrans;
+ 	rid->identifierType = type;
+ 	if (type == NSSCMSRecipientID_IssuerSN) {
+ 	    rid->id.issuerAndSN = CERT_GetCertIssuerAndSN(poolp, cert);
+ 	    if (rid->id.issuerAndSN == NULL) {
+ 	      break;
+ 	    }
+ 	} else if (type == NSSCMSRecipientID_SubjectKeyID){
+@@ -537,38 +538,48 @@ NSS_CMSRecipientInfo_WrapBulkKey(NSSCMSR
+ 	/* the keyEncAlg, set encKey, keyEncAlg, publicKey etc. */
+ 	rv = NSS_CMSUtil_EncryptSymKey_ESDH(poolp, cert, bulkkey,
+ 					&rek->encKey,
+ 					&ri->ri.keyAgreeRecipientInfo.ukm,
+ 					&ri->ri.keyAgreeRecipientInfo.keyEncAlg,
+ 					&oiok->id.originatorPublicKey.publicKey);
+ 
+ 	break;
++    case SEC_OID_GOSTR3410:
++	rv = NSS_CMSUtil_EncryptSymKey_GOSTR3410(poolp, cert, bulkkey, 
++	                         &ri->ri.keyTransRecipientInfo.encKey);
++ 	if (rv != SECSuccess)
++	    break;
++	rv = SECOID_SetAlgorithmID(poolp,
++	        &(ri->ri.keyTransRecipientInfo.keyEncAlg), certalgtag, NULL);
++	break;
+     default:
+ 	/* other algorithms not supported yet */
+ 	/* NOTE that we do not support any KEK algorithm */
+ 	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+ 	rv = SECFailure;
+ 	break;
+     }
+     if (freeSpki)
+ 	SECKEY_DestroySubjectPublicKeyInfo(freeSpki);
+ 
+     return rv;
+ }
+ 
+ PK11SymKey *
+ NSS_CMSRecipientInfo_UnwrapBulkKey(NSSCMSRecipientInfo *ri, int subIndex, 
+-	CERTCertificate *cert, SECKEYPrivateKey *privkey, SECOidTag bulkalgtag)
++	CERTCertificate *cert, SECKEYPrivateKey *privkey, SECOidTag bulkalgtag,
++	NSSCMSContentInfo *cinfo, PLArenaPool *arena)
+ {
+     PK11SymKey *bulkkey = NULL;
+     SECAlgorithmID *encalg;
+     SECOidTag encalgtag;
+     SECItem *enckey;
+     int error;
++    SECItem keyParam;
+ 
+     ri->cert = CERT_DupCertificate(cert);
+         	/* mark the recipientInfo so we can find it later */
+ 
+     switch (ri->recipientInfoType) {
+     case NSSCMSRecipientInfoID_KeyTrans:
+ 	encalg = &(ri->ri.keyTransRecipientInfo.keyEncAlg);
+ 	encalgtag = SECOID_GetAlgorithmTag(&(ri->ri.keyTransRecipientInfo.keyEncAlg));
+@@ -579,16 +590,26 @@ NSS_CMSRecipientInfo_UnwrapBulkKey(NSSCM
+ 	    /* get the symmetric (bulk) key by unwrapping it using our private key */
+ 	    bulkkey = NSS_CMSUtil_DecryptSymKey_RSA(privkey, enckey, bulkalgtag);
+ 	    break;
+ 	case SEC_OID_NETSCAPE_SMIME_KEA:
+ 	    /* FORTEZZA key exchange algorithm */
+ 	    /* the supplemental data is in the parameters of encalg */
+ 	    bulkkey = NSS_CMSUtil_DecryptSymKey_MISSI(privkey, enckey, encalg, bulkalgtag, ri->cmsg->pwfn_arg);
+ 	    break;
++	case SEC_OID_GOSTR3410:
++	    if (!cinfo || PK11_DecodeGOST28147AlgorithmIDParams(arena,
++	            &(cinfo->contentEncAlg.parameters),
++	            &keyParam, NULL) != SECSuccess) {
++	        error = SEC_ERROR_INVALID_ALGORITHM;
++	        goto loser;
++	    }
++	    bulkkey = NSS_CMSUtil_DecryptSymKey_GOSTR3410(privkey, enckey,
++	            bulkalgtag, &keyParam);
++	    break;
+ 	default:
+ 	    error = SEC_ERROR_UNSUPPORTED_KEYALG;
+ 	    goto loser;
+ 	}
+ 	break;
+     case NSSCMSRecipientInfoID_KeyAgree:
+ 	encalg = &(ri->ri.keyAgreeRecipientInfo.keyEncAlg);
+ 	encalgtag = SECOID_GetAlgorithmTag(&(ri->ri.keyAgreeRecipientInfo.keyEncAlg));
+diff --git a/security/nss/lib/smime/smimeutil.c b/security/nss/lib/smime/smimeutil.c
+--- a/security/nss/lib/smime/smimeutil.c
++++ b/security/nss/lib/smime/smimeutil.c
+@@ -148,17 +148,18 @@ static smime_cipher_map_entry smime_ciph
+ /*    cipher			algtag			parms		enabled  allowed */
+ /*    ---------------------------------------------------------------------------------- */
+     { SMIME_RC2_CBC_40,		SEC_OID_RC2_CBC,	&param_int40,	PR_TRUE, PR_TRUE },
+     { SMIME_DES_CBC_56,		SEC_OID_DES_CBC,	NULL,		PR_TRUE, PR_TRUE },
+     { SMIME_RC2_CBC_64,		SEC_OID_RC2_CBC,	&param_int64,	PR_TRUE, PR_TRUE },
+     { SMIME_RC2_CBC_128,	SEC_OID_RC2_CBC,	&param_int128,	PR_TRUE, PR_TRUE },
+     { SMIME_DES_EDE3_168,	SEC_OID_DES_EDE3_CBC,	NULL,		PR_TRUE, PR_TRUE },
+     { SMIME_AES_CBC_128,	SEC_OID_AES_128_CBC,	NULL,		PR_TRUE, PR_TRUE },
+-    { SMIME_FORTEZZA,		SEC_OID_FORTEZZA_SKIPJACK, NULL,	PR_TRUE, PR_TRUE }
++    { SMIME_FORTEZZA,		SEC_OID_FORTEZZA_SKIPJACK, NULL,	PR_TRUE, PR_TRUE },
++    { SMIME_GOST,			SEC_OID_GOST28147,	NULL,		PR_TRUE, PR_TRUE }
+ };
+ static const int smime_cipher_map_count = sizeof(smime_cipher_map) / sizeof(smime_cipher_map_entry);
+ 
+ /*
+  * smime_mapi_by_cipher - find index into smime_cipher_map by cipher
+  */
+ static int
+ smime_mapi_by_cipher(unsigned long cipher)
+@@ -271,16 +272,19 @@ nss_smime_get_cipher_for_alg_and_key(SEC
+ 	c = SMIME_DES_EDE3_168;
+ 	break;
+     case SEC_OID_AES_128_CBC:
+ 	c = SMIME_AES_CBC_128;
+ 	break;
+     case SEC_OID_FORTEZZA_SKIPJACK:
+ 	c = SMIME_FORTEZZA;
+ 	break;
++    case SEC_OID_GOST28147:
++	c = SMIME_GOST;
++	break;
+     default:
+ 	return SECFailure;
+     }
+     *cipher = c;
+     return SECSuccess;
+ }
+ 
+ static PRBool
+@@ -417,16 +421,22 @@ smime_choose_cipher(CERTCertificate *sce
+     }
+ 
+     /* walk all the recipient's certs */
+     for (rcount = 0; rcerts[rcount] != NULL; rcount++) {
+ 	SECItem *profile;
+ 	NSSSMIMECapability **caps;
+ 	int pref;
+ 
++	/* checking for GOST */
++	if (CERT_GetCertKeyType(&(rcerts[rcount]->subjectPublicKeyInfo)) == gostR3410Key) {
++	    chosen_cipher = SMIME_GOST;
++	    goto done;
++	}
++
+ 	/* the first cipher that matches in the user's SMIME profile gets
+ 	 * "smime_cipher_map_count" votes; the next one gets "smime_cipher_map_count" - 1
+ 	 * and so on. If every cipher matches, the last one gets 1 (one) vote */
+ 	pref = smime_cipher_map_count;
+ 
+ 	/* find recipient's SMIME profile */
+ 	profile = CERT_FindSMimeProfile(rcerts[rcount]);
+ 
+@@ -537,16 +547,17 @@ smime_keysize_by_cipher (unsigned long w
+ 	break;
+       case SMIME_RC2_CBC_128:
+       case SMIME_AES_CBC_128:
+ 	keysize = 128;
+ 	break;
+       case SMIME_DES_CBC_56:
+       case SMIME_DES_EDE3_168:
+       case SMIME_FORTEZZA:
++      case SMIME_GOST:
+ 	/*
+ 	 * These are special; since the key size is fixed, we actually
+ 	 * want to *avoid* specifying a key size.
+ 	 */
+ 	keysize = 0;
+ 	break;
+       default:
+ 	keysize = -1;
+diff --git a/security/nss/lib/ssl/nsskea.c b/security/nss/lib/ssl/nsskea.c
+--- a/security/nss/lib/ssl/nsskea.c
++++ b/security/nss/lib/ssl/nsskea.c
+@@ -61,16 +61,19 @@ NSS_FindCertKEAType(CERTCertificate * ce
+   case SEC_OID_X942_DIFFIE_HELMAN_KEY:
+     keaType = kt_dh;
+     break;
+ #ifdef NSS_ENABLE_ECC
+   case SEC_OID_ANSIX962_EC_PUBLIC_KEY:
+     keaType = kt_ecdh;
+     break;
+ #endif /* NSS_ENABLE_ECC */
++  case SEC_OID_GOSTR3410:
++    keaType = kt_gost;
++    break;
+   default:
+     keaType = kt_null;
+   }
+   
+  loser:
+   
+   return keaType;
+ 
+diff --git a/security/nss/lib/ssl/ssl3con.c b/security/nss/lib/ssl/ssl3con.c
+--- a/security/nss/lib/ssl/ssl3con.c
++++ b/security/nss/lib/ssl/ssl3con.c
+@@ -67,20 +67,28 @@
+ #endif
+ 
+ #ifndef PK11_SETATTRS
+ #define PK11_SETATTRS(x,id,v,l) (x)->type = (id); \
+ 		(x)->pValue=(v); (x)->ulValueLen = (l);
+ #endif
+ 
+ static void      ssl3_CleanupPeerCerts(sslSocket *ss);
++static SECStatus ssl3_TLS_PRFGOST(PK11SymKey *key,
++		const char *label, unsigned int label_len,
++		const unsigned char *seed, unsigned int seed_len,
++		unsigned char *out, unsigned int out_len);
+ static PK11SymKey *ssl3_GenerateRSAPMS(sslSocket *ss, ssl3CipherSpec *spec,
+                                        PK11SlotInfo * serverKeySlot);
++static PK11SymKey *ssl3_GenerateGOSTPMS(sslSocket *ss, ssl3CipherSpec *spec,
++                                       PK11SlotInfo * serverKeySlot);
+ static SECStatus ssl3_DeriveMasterSecret(sslSocket *ss, PK11SymKey *pms);
++static SECStatus ssl3_DeriveGOSTMasterSecret(sslSocket *ss, PK11SymKey *pms);
+ static SECStatus ssl3_DeriveConnectionKeysPKCS11(sslSocket *ss);
++static SECStatus ssl3_DeriveGOSTConnectionKeys(sslSocket *ss);
+ static SECStatus ssl3_HandshakeFailure(      sslSocket *ss);
+ static SECStatus ssl3_InitState(             sslSocket *ss);
+ static SECStatus ssl3_SendCertificate(       sslSocket *ss);
+ static SECStatus ssl3_SendEmptyCertificate(  sslSocket *ss);
+ static SECStatus ssl3_SendCertificateRequest(sslSocket *ss);
+ static SECStatus ssl3_SendFinished(          sslSocket *ss, PRInt32 flags);
+ static SECStatus ssl3_SendServerHello(       sslSocket *ss);
+ static SECStatus ssl3_SendServerHelloDone(   sslSocket *ss);
+@@ -115,16 +123,18 @@ static ssl3CipherSuiteCfg cipherSuites[s
+  { TLS_DHE_DSS_WITH_AES_256_CBC_SHA, 	   SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+ #ifdef NSS_ENABLE_ECC
+  { TLS_ECDH_RSA_WITH_AES_256_CBC_SHA,      SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+  { TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA,    SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+ #endif /* NSS_ENABLE_ECC */
+  { TLS_RSA_WITH_CAMELLIA_256_CBC_SHA,  	   SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+  { TLS_RSA_WITH_AES_256_CBC_SHA,     	   SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+ 
++ { TLS_GOSTR341001_WITH_28147_CNT_IMIT,    SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
++
+ #ifdef NSS_ENABLE_ECC
+  { TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,       SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+  { TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,   SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+  { TLS_ECDHE_RSA_WITH_RC4_128_SHA,         SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+  { TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,     SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+ #endif /* NSS_ENABLE_ECC */
+  { TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA,  SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+  { TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA,  SSL_NOT_ALLOWED, PR_FALSE,PR_FALSE},
+@@ -210,16 +220,17 @@ compressionEnabled(sslSocket *ss, SSLCom
+ }
+ 
+ static const /*SSL3ClientCertificateType */ uint8 certificate_types [] = {
+     ct_RSA_sign,
+     ct_DSS_sign,
+ #ifdef NSS_ENABLE_ECC
+     ct_ECDSA_sign,
+ #endif /* NSS_ENABLE_ECC */
++    ct_GOSTR3410_sign,
+ };
+ 
+ #ifdef NSS_ENABLE_ZLIB
+ /*
+  * The DEFLATE algorithm can result in an expansion of 0.1% + 12 bytes. For a
+  * maximum TLS record payload of 2**14 bytes, that's 29 bytes.
+  */
+ #define SSL3_COMPRESSION_MAX_EXPANSION 29
+@@ -258,16 +269,17 @@ static const ssl3BulkCipherDef bulk_ciph
+     {cipher_3des,      calg_3des,     24, 24, type_block,   8, 8, kg_strong},
+     {cipher_des40,     calg_des,       8,  5, type_block,   8, 8, kg_export},
+     {cipher_idea,      calg_idea,     16, 16, type_block,   8, 8, kg_strong},
+     {cipher_aes_128,   calg_aes,      16, 16, type_block,  16,16, kg_strong},
+     {cipher_aes_256,   calg_aes,      32, 32, type_block,  16,16, kg_strong},
+     {cipher_camellia_128, calg_camellia,16, 16, type_block,  16,16, kg_strong},
+     {cipher_camellia_256, calg_camellia,32, 32, type_block,  16,16, kg_strong},
+     {cipher_seed,      calg_seed,     16, 16, type_block,  16,16, kg_strong},
++    {cipher_gost,      calg_gost,     32, 32, type_stream,  8, 0, kg_strong},
+     {cipher_missing,   calg_null,      0,  0, type_stream,  0, 0, kg_null},
+ };
+ 
+ static const ssl3KEADef kea_defs[] = 
+ { /* indexed by SSL3KeyExchangeAlgorithm */
+     /* kea              exchKeyType signKeyType is_limited limit  tls_keygen */
+     {kea_null,           kt_null,     sign_null, PR_FALSE,   0, PR_FALSE},
+     {kea_rsa,            kt_rsa,      sign_rsa,  PR_FALSE,   0, PR_FALSE},
+@@ -279,16 +291,17 @@ static const ssl3KEADef kea_defs[] =
+     {kea_dh_rsa_export,  kt_dh,       sign_rsa,  PR_TRUE,  512, PR_FALSE},
+     {kea_dhe_dss,        kt_dh,       sign_dsa,  PR_FALSE,   0, PR_FALSE},
+     {kea_dhe_dss_export, kt_dh,       sign_dsa,  PR_TRUE,  512, PR_FALSE},
+     {kea_dhe_rsa,        kt_dh,       sign_rsa,  PR_FALSE,   0, PR_FALSE},
+     {kea_dhe_rsa_export, kt_dh,       sign_rsa,  PR_TRUE,  512, PR_FALSE},
+     {kea_dh_anon,        kt_dh,       sign_null, PR_FALSE,   0, PR_FALSE},
+     {kea_dh_anon_export, kt_dh,       sign_null, PR_TRUE,  512, PR_FALSE},
+     {kea_rsa_fips,       kt_rsa,      sign_rsa,  PR_FALSE,   0, PR_TRUE },
++    {kea_gost,           kt_gost,     sign_gost, PR_FALSE,   0, PR_FALSE},
+ #ifdef NSS_ENABLE_ECC
+     {kea_ecdh_ecdsa,     kt_ecdh,     sign_ecdsa,  PR_FALSE, 0, PR_FALSE},
+     {kea_ecdhe_ecdsa,    kt_ecdh,     sign_ecdsa,  PR_FALSE,   0, PR_FALSE},
+     {kea_ecdh_rsa,       kt_ecdh,     sign_rsa,  PR_FALSE,   0, PR_FALSE},
+     {kea_ecdhe_rsa,      kt_ecdh,     sign_rsa,  PR_FALSE,   0, PR_FALSE},
+     {kea_ecdh_anon,      kt_ecdh,     sign_null,  PR_FALSE,   0, PR_FALSE},
+ #endif /* NSS_ENABLE_ECC */
+ };
+@@ -409,24 +422,26 @@ static const ssl3CipherSuiteDef cipher_s
+ #if 0
+     {TLS_ECDH_anon_WITH_NULL_SHA,         cipher_null,    mac_sha, kea_ecdh_anon},
+     {TLS_ECDH_anon_WITH_RC4_128_SHA,      cipher_rc4,     mac_sha, kea_ecdh_anon},
+     {TLS_ECDH_anon_WITH_3DES_EDE_CBC_SHA, cipher_3des,    mac_sha, kea_ecdh_anon},
+     {TLS_ECDH_anon_WITH_AES_128_CBC_SHA,  cipher_aes_128, mac_sha, kea_ecdh_anon},
+     {TLS_ECDH_anon_WITH_AES_256_CBC_SHA,  cipher_aes_256, mac_sha, kea_ecdh_anon},
+ #endif
+ #endif /* NSS_ENABLE_ECC */
++    {TLS_GOSTR341001_WITH_28147_CNT_IMIT, cipher_gost,    mac_gost, kea_gost},
+ };
+ 
+ static const CK_MECHANISM_TYPE kea_alg_defs[] = {
+     0x80000000L,
+     CKM_RSA_PKCS,
+     CKM_DH_PKCS_DERIVE,
+     CKM_KEA_KEY_DERIVE,
+-    CKM_ECDH1_DERIVE
++    CKM_ECDH1_DERIVE,
++    CKM_GOSTR3410_KEY_WRAP
+ };
+ 
+ typedef struct SSLCipher2MechStr {
+     SSLCipherAlgorithm  calg;
+     CK_MECHANISM_TYPE   cmech;
+ } SSLCipher2Mech;
+ 
+ /* indexed by type SSLCipherAlgorithm */
+@@ -437,32 +452,35 @@ static const SSLCipher2Mech alg2Mech[] =
+     { calg_rc2      , CKM_RC2_CBC			},
+     { calg_des      , CKM_DES_CBC			},
+     { calg_3des     , CKM_DES3_CBC			},
+     { calg_idea     , CKM_IDEA_CBC			},
+     { calg_fortezza , CKM_SKIPJACK_CBC64                },
+     { calg_aes      , CKM_AES_CBC			},
+     { calg_camellia , CKM_CAMELLIA_CBC			},
+     { calg_seed     , CKM_SEED_CBC			},
++    { calg_gost     , CKM_GOST28147			},
+ /*  { calg_init     , (CK_MECHANISM_TYPE)0x7fffffffL    }  */
+ };
+ 
+ #define mmech_null     (CK_MECHANISM_TYPE)0x80000000L
+ #define mmech_md5      CKM_SSL3_MD5_MAC
+ #define mmech_sha      CKM_SSL3_SHA1_MAC
+ #define mmech_md5_hmac CKM_MD5_HMAC
+ #define mmech_sha_hmac CKM_SHA_1_HMAC
++#define mmech_gost_mac CKM_GOST28147_MAC
+ 
+ static const ssl3MACDef mac_defs[] = { /* indexed by SSL3MACAlgorithm */
+     /* mac      mmech       pad_size  mac_size                       */
+     { mac_null, mmech_null,       0,  0          },
+     { mac_md5,  mmech_md5,       48,  MD5_LENGTH },
+     { mac_sha,  mmech_sha,       40,  SHA1_LENGTH},
+     {hmac_md5,  mmech_md5_hmac,  48,  MD5_LENGTH },
+     {hmac_sha,  mmech_sha_hmac,  40,  SHA1_LENGTH},
++    { mac_gost, mmech_gost_mac,  32,  4},
+ };
+ 
+ /* indexed by SSL3BulkCipher */
+ const char * const ssl3_cipherName[] = {
+     "NULL",
+     "RC4",
+     "RC4-40",
+     "RC4-56",
+@@ -472,16 +490,17 @@ const char * const ssl3_cipherName[] = {
+     "3DES-EDE-CBC",
+     "DES-CBC-40",
+     "IDEA-CBC",
+     "AES-128",
+     "AES-256",
+     "Camellia-128",
+     "Camellia-256",
+     "SEED-CBC",
++    "GOST28147",
+     "missing"
+ };
+ 
+ #ifdef NSS_ENABLE_ECC
+ /* The ECCWrappedKeyInfo structure defines how various pieces of 
+  * information are laid out within wrappedSymmetricWrappingkey 
+  * for ECDH key exchange. Since wrappedSymmetricWrappingkey is 
+  * a 512-byte buffer (see sslimpl.h), the variable length field 
+@@ -859,30 +878,34 @@ ssl3_SignHashes(SSL3Hashes *hash, SECKEY
+     buf->len  = (unsigned)signatureLen;
+     buf->data = (unsigned char *)PORT_Alloc(signatureLen);
+     if (!buf->data)
+         goto done;	/* error code was set. */
+ 
+     switch (key->keyType) {
+     case rsaKey:
+     	hashItem.data = hash->md5;
+-    	hashItem.len = sizeof(SSL3Hashes);
++    	hashItem.len = sizeof(hash->md5) + sizeof(hash->sha);
+ 	break;
+     case dsaKey:
+ 	doDerEncode = isTLS;
+ 	hashItem.data = hash->sha;
+ 	hashItem.len = sizeof(hash->sha);
+ 	break;
+ #ifdef NSS_ENABLE_ECC
+     case ecKey:
+ 	doDerEncode = PR_TRUE;
+ 	hashItem.data = hash->sha;
+ 	hashItem.len = sizeof(hash->sha);
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
++    case gostR3410Key:
++	hashItem.data = hash->gost;
++	hashItem.len = sizeof(hash->gost);
++	break;
+     default:
+ 	PORT_SetError(SEC_ERROR_INVALID_KEY);
+ 	goto done;
+     }
+     PRINT_BUF(60, (NULL, "hash(es) to be signed", hashItem.data, hashItem.len));
+ 
+     rv = PK11_Sign(key, buf, &hashItem);
+     if (rv != SECSuccess) {
+@@ -895,16 +918,31 @@ ssl3_SignHashes(SSL3Hashes *hash, SECKEY
+ 	if (rv == SECSuccess) {
+ 	    PORT_Free(buf->data);	/* discard unencoded signature. */
+ 	    *buf = derSig;		/* give caller encoded signature. */
+ 	} else if (derSig.data) {
+ 	    PORT_Free(derSig.data);
+ 	}
+     }
+ 
++    if (key->keyType == gostR3410Key) { /* reverse byte order */
++        unsigned char c;
++        int i;
++        if (buf->len != 64) {
++            ssl_MapLowLevelError(SSL_ERROR_SIGN_HASHES_FAILURE);
++            rv = SECFailure;
++        } else
++            for (i = 0; i < 32; i++) {
++                c = ((unsigned char*)buf->data)[i];
++                ((unsigned char*)buf->data)[i] =
++		        ((unsigned char*)buf->data)[63 - i];
++                ((unsigned char*)buf->data)[63 - i] = c;
++            }
++    }
++
+     PRINT_BUF(60, (NULL, "signed hashes", (unsigned char*)buf->data, buf->len));
+ done:
+     if (rv != SECSuccess && buf->data) {
+ 	PORT_Free(buf->data);
+ 	buf->data = NULL;
+     }
+     return rv;
+ }
+@@ -931,17 +969,17 @@ ssl3_VerifySignedHashes(SSL3Hashes *hash
+ 	/* CERT_ExtractPublicKey doesn't set error code */
+ 	PORT_SetError(SSL_ERROR_EXTRACT_PUBLIC_KEY_FAILURE);
+     	return SECFailure;
+     }
+ 
+     switch (key->keyType) {
+     case rsaKey:
+     	hashItem.data = hash->md5;
+-    	hashItem.len = sizeof(SSL3Hashes);
++    	hashItem.len = sizeof(hash->md5) + sizeof(hash->sha);
+ 	break;
+     case dsaKey:
+ 	hashItem.data = hash->sha;
+ 	hashItem.len = sizeof(hash->sha);
+ 	/* Allow DER encoded DSA signatures in SSL 3.0 */
+ 	if (isTLS || buf->len != DSA_SIGNATURE_LEN) {
+ 	    signature = DSAU_DecodeDerSig(buf);
+ 	    if (!signature) {
+@@ -971,16 +1009,34 @@ ssl3_VerifySignedHashes(SSL3Hashes *hash
+ 	if (!signature) {
+ 	    PORT_SetError(SSL_ERROR_BAD_HANDSHAKE_HASH_VALUE);
+ 	    return SECFailure;
+ 	}
+ 	buf = signature;
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    case gostR3410Key:
++        { /* reverse byte order */
++          unsigned char c;
++          int i;
++          if (buf->len != 64) {
++            PORT_SetError(SSL_ERROR_BAD_HANDSHAKE_HASH_VALUE);
++            return SECFailure;
++          } else
++            for (i = 0; i < 32; i++) {
++              c = ((unsigned char*)buf->data)[i];
++              ((unsigned char*)buf->data)[i] =
++	              ((unsigned char*)buf->data)[63 - i];
++              ((unsigned char*)buf->data)[63 - i] = c;
++            }
++        }
++        hashItem.data = hash->gost;
++        hashItem.len = sizeof(hash->gost);
++        break;
+     default:
+     	SECKEY_DestroyPublicKey(key);
+ 	PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+ 	return SECFailure;
+     }
+ 
+     PRINT_BUF(60, (NULL, "hash(es) to be verified",
+                   hashItem.data, hashItem.len));
+@@ -1246,17 +1302,17 @@ ssl3_SetupPendingCipherSpec(sslSocket *s
+ 	ssl_ReleaseSpecWriteLock(ss);
+ 	return SECFailure;	/* error code set by ssl_LookupCipherSuiteDef */
+     }
+ 
+ 
+     cipher = suite_def->bulk_cipher_alg;
+     kea    = suite_def->key_exchange_alg;
+     mac    = suite_def->mac_alg;
+-    if (isTLS)
++    if (isTLS && (mac == ssl_mac_md5 || mac == ssl_mac_sha))
+ 	mac += 2;
+ 
+     ss->ssl3.hs.suite_def = suite_def;
+     ss->ssl3.hs.kea_def   = &kea_defs[kea];
+     PORT_Assert(ss->ssl3.hs.kea_def->kea == kea);
+ 
+     pwSpec->cipher_def   = &bulk_cipher_defs[cipher];
+     PORT_Assert(pwSpec->cipher_def->cipher == cipher);
+@@ -1562,16 +1618,17 @@ const ssl3BulkCipherDef *cipher_def;
+         optArg1 = !optArg1;
+         break;
+     /* kill warnings. */
+     case ssl_calg_null:
+     case ssl_calg_rc4:
+     case ssl_calg_rc2:
+     case ssl_calg_idea:
+     case ssl_calg_fortezza:
++    case ssl_calg_gost:
+         break;
+     }
+ 
+     rv = (*initFn)(clientContext,
+ 		   pwSpec->client.write_key_item.data,
+ 		   pwSpec->client.write_key_item.len,
+ 		   pwSpec->client.write_iv_item.data,
+ 		   mode, optArg1, optArg2);
+@@ -1645,30 +1702,40 @@ const ssl3BulkCipherDef *cipher_def;
+ 
+     /* 
+     ** Now setup the MAC contexts, 
+     **   crypto contexts are setup below.
+     */
+ 
+     pwSpec->client.write_mac_context = NULL;
+     pwSpec->server.write_mac_context = NULL;
+-    mac_mech       = pwSpec->mac_def->mmech;
++    switch ((mac_mech = pwSpec->mac_def->mmech)) {
++    case CKM_GOST28147_MAC:
++        mac_param.data = NULL;
++        mac_param.len  = 0;
++        mac_param.type = 0;
++        break;
++    default:
+     mac_param.data = (unsigned char *)&macLength;
+     mac_param.len  = sizeof(macLength);
+     mac_param.type = 0;
++    break;
++    }
+ 
+     pwSpec->client.write_mac_context = PK11_CreateContextBySymKey(
+ 	    mac_mech, CKA_SIGN, pwSpec->client.write_mac_key, &mac_param);
+-    if (pwSpec->client.write_mac_context == NULL)  {
++    if (pwSpec->client.write_mac_context == NULL ||
++            PK11_DigestBegin(pwSpec->client.write_mac_context))  {
+ 	ssl_MapLowLevelError(SSL_ERROR_SYM_KEY_CONTEXT_FAILURE);
+ 	goto fail;
+     }
+     pwSpec->server.write_mac_context = PK11_CreateContextBySymKey(
+ 	    mac_mech, CKA_SIGN, pwSpec->server.write_mac_key, &mac_param);
+-    if (pwSpec->server.write_mac_context == NULL) {
++    if (pwSpec->server.write_mac_context == NULL ||
++            PK11_DigestBegin(pwSpec->server.write_mac_context)) {
+ 	ssl_MapLowLevelError(SSL_ERROR_SYM_KEY_CONTEXT_FAILURE);
+ 	goto fail;
+     }
+ 
+     /* 
+     ** Now setup the crypto contexts.
+     */
+ 
+@@ -1779,16 +1846,19 @@ ssl3_InitPendingCipherSpec(sslSocket *ss
+ 
+     ssl_GetSpecWriteLock(ss);	/**************************************/
+ 
+     PORT_Assert(ss->ssl3.prSpec == ss->ssl3.pwSpec);
+ 
+     pwSpec        = ss->ssl3.pwSpec;
+ 
+     if (pms || (!pwSpec->msItem.len && !pwSpec->master_secret)) {
++	if (ss->ssl3.hs.kea_def->exchKeyType == kt_gost)
++	    rv = ssl3_DeriveGOSTMasterSecret(ss, pms);
++	else
+ 	rv = ssl3_DeriveMasterSecret(ss, pms);
+ 	if (rv != SECSuccess) {
+ 	    goto done;  /* err code set by ssl3_DeriveMasterSecret */
+ 	}
+     }
+     if (ss->opt.bypassPKCS11 && pwSpec->msItem.len && pwSpec->msItem.data) {
+ 	/* Double Bypass succeeded in extracting the master_secret */
+ 	const ssl3KEADef * kea_def = ss->ssl3.hs.kea_def;
+@@ -1799,16 +1869,19 @@ ssl3_InitPendingCipherSpec(sslSocket *ss
+ 			     (const unsigned char *)&ss->ssl3.hs.client_random,
+ 			     (const unsigned char *)&ss->ssl3.hs.server_random,
+ 			     isTLS, 
+ 			     (PRBool)(kea_def->is_limited));
+ 	if (rv == SECSuccess) {
+ 	    rv = ssl3_InitPendingContextsBypass(ss);
+ 	}
+     } else if (pwSpec->master_secret) {
++	if (ss->ssl3.hs.kea_def->exchKeyType == kt_gost)
++	    rv = ssl3_DeriveGOSTConnectionKeys(ss);
++	else
+ 	rv = ssl3_DeriveConnectionKeysPKCS11(ss);
+ 	if (rv == SECSuccess) {
+ 	    rv = ssl3_InitPendingContextsPKCS11(ss);
+ 	}
+     } else {
+ 	PORT_Assert(pwSpec->master_secret);
+ 	PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+ 	rv = SECFailure;
+@@ -1905,20 +1978,26 @@ ssl3_ComputeRecordMAC(
+     if (mac_def->mac == mac_null) {
+ 	*outLength = 0;
+ 	return SECSuccess;
+     }
+     if (! spec->bypassCiphers) {
+ 	PK11Context *mac_context = 
+ 	    (useServerMacKey ? spec->server.write_mac_context
+ 	                     : spec->client.write_mac_context);
+-	rv  = PK11_DigestBegin(mac_context);
++	rv = 0;
++	if (mac_def->mac != mac_gost)
++	    rv = PK11_DigestBegin(mac_context);
+ 	rv |= PK11_DigestOp(mac_context, temp, tempLen);
+ 	rv |= PK11_DigestOp(mac_context, input, inputLength);
++	if (mac_def->mac == mac_gost)
++	    mac_context = PK11_CloneContext(mac_context);
+ 	rv |= PK11_DigestFinal(mac_context, outbuf, outLength, spec->mac_size);
++	if (mac_def->mac == mac_gost)
++	    PK11_DestroyContext(mac_context, 1);
+     } else {
+ 	/* bypass version */
+ 	const SECHashObject *hashObj = NULL;
+ 	unsigned int       pad_bytes = 0;
+ 	PRUint64           write_mac_context[MAX_MAC_CONTEXT_LLONGS];
+ 
+ 	switch (mac_def->mac) {
+ 	case ssl_mac_null:
+@@ -2955,16 +3034,75 @@ ssl3_DeriveMasterSecret(sslSocket *ss, P
+ 	} else {
+ 	    PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+ 	    return SECFailure;
+ 	}
+     }
+     return SECSuccess;
+ }
+ 
++static SECStatus
++ssl3_DeriveGOSTMasterSecret(sslSocket *ss, PK11SymKey *pms)
++{
++    ssl3CipherSpec *  pwSpec = ss->ssl3.pwSpec;
++    unsigned char *   cr     = (unsigned char *)&ss->ssl3.hs.client_random;
++    unsigned char *   sr     = (unsigned char *)&ss->ssl3.hs.server_random;
++    SECStatus         rv = SECFailure;
++    CK_BYTE           seed[64];
++    CK_BYTE           keyval[48];
++    PK11SlotInfo *    slot;
++    SECItem           key = { 0, keyval, sizeof(keyval) };
++
++    PORT_Assert( ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss));
++    PORT_Assert( ss->opt.noLocks || ssl_HaveSpecWriteLock(ss));
++    PORT_Assert(ss->ssl3.prSpec == ss->ssl3.pwSpec);
++
++    if (pms == NULL) {
++	ssl_MapLowLevelError(SSL_ERROR_SESSION_KEY_GEN_FAILURE);
++	return SECFailure;
++    }
++
++#if defined(TRACE)
++	if (ssl_trace >= 100) {
++	    SECStatus extractRV = PK11_ExtractKeyValue(pms);
++	    if (extractRV == SECSuccess) {
++		SECItem * keyData = PK11_GetKeyData(pms);
++		if (keyData && keyData->data && keyData->len) {
++		    ssl_PrintBuf(ss, "Pre-Master Secret", 
++				 keyData->data, keyData->len);
++		}
++	    }
++	}
++#endif
++
++    slot = PK11_GetSlotFromKey(pms);
++
++    PORT_Memcpy(seed, cr, 32);
++    PORT_Memcpy(seed + 32, sr, 32);
++    rv = ssl3_TLS_PRFGOST(pms, "master secret", 13, seed, 64,
++            keyval, sizeof(keyval));
++
++    if (rv != SECSuccess) {
++        PK11_FreeSlot(slot);
++	ssl_MapLowLevelError(SSL_ERROR_SESSION_KEY_GEN_FAILURE);
++	return SECFailure;
++    }
++
++    pwSpec->master_secret = PK11_ImportSymKey(slot, CKM_GOSTR3411_HMAC,
++            PK11_OriginDerive, CKA_SIGN, &key, ss->pkcs11PinArg);
++    PORT_Memset(keyval, 0, sizeof(keyval));
++    PK11_FreeSlot(slot);
++
++    if (pwSpec->master_secret == NULL) {
++	ssl_MapLowLevelError(SSL_ERROR_SESSION_KEY_GEN_FAILURE);
++	return SECFailure;
++    }
++
++    return SECSuccess;
++}
+ 
+ /* 
+  * Derive encryption and MAC Keys (and IVs) from master secret
+  * Sets a useful error code when returning SECFailure.
+  *
+  * Called only from ssl3_InitPendingCipherSpec(),
+  * which in turn is called from
+  *              sendRSAClientKeyExchange        (for Full handshake)
+@@ -3094,16 +3232,116 @@ ssl3_DeriveConnectionKeysPKCS11(sslSocke
+ 
+ 
+ loser:
+     if (symKey) PK11_FreeSymKey(symKey);
+     ssl_MapLowLevelError(SSL_ERROR_SESSION_KEY_GEN_FAILURE);
+     return SECFailure;
+ }
+ 
++/*
++ * XXX this OID is "internal-use" and should be changed
++ * to a standard one (if it ever appears)
++ */
++static unsigned char gost28147_tls_params[] =
++        { 0x06, 0x08, 0x2a, 0x85, 0x03, 0x02, 0x0c, 0x01, 0x05, 0x02 };
++static SECStatus
++ssl3_DeriveGOSTConnectionKeys(sslSocket *ss)
++{
++    ssl3CipherSpec *         pwSpec     = ss->ssl3.pwSpec;
++    unsigned char *   cr     = (unsigned char *)&ss->ssl3.hs.client_random;
++    unsigned char *   sr     = (unsigned char *)&ss->ssl3.hs.server_random;
++    PK11SlotInfo *         slot   = NULL;
++    void *                 pwArg  = ss->pkcs11PinArg;
++    CK_BYTE                key_material[144];
++    SECItem                key = {0, NULL, 32 };
++    CK_ATTRIBUTE           template[6];
++    CK_OBJECT_CLASS keyClass    = CKO_SECRET_KEY;
++    CK_KEY_TYPE     keyType     = CKK_GOST28147;
++    CK_BBOOL        cktrue  = CK_TRUE;
++    SECStatus         rv = SECFailure;
++    CK_BYTE           seed[64];
++
++    PORT_Assert( ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss));
++    PORT_Assert( ss->opt.noLocks || ssl_HaveSpecWriteLock(ss));
++    PORT_Assert(ss->ssl3.prSpec == ss->ssl3.pwSpec);
++
++    if (!pwSpec->master_secret) {
++	PORT_SetError(SSL_ERROR_SESSION_KEY_GEN_FAILURE);
++	return SECFailure;
++    }
++
++    slot = PK11_GetBestSlot(CKM_GOST28147, pwArg);
++    PORT_Memcpy(seed, sr, 32);
++    PORT_Memcpy(seed + 32, cr, 32);
++    rv = ssl3_TLS_PRFGOST(pwSpec->master_secret, "key expansion", 13,
++            seed, 64, key_material, sizeof(key_material));
++
++    if (rv != SECSuccess) {
++	goto loser;	/* loser sets err */
++    }
++
++    PK11_SETATTRS(&template[0], CKA_CLASS, &keyClass, sizeof(keyClass));
++    PK11_SETATTRS(&template[1], CKA_KEY_TYPE, &keyType, sizeof(keyType));
++    PK11_SETATTRS(&template[2], CKA_GOST28147PARAMS,
++            gost28147_tls_params, sizeof(gost28147_tls_params));
++
++    PK11_SETATTRS(&template[3], CKA_SIGN, &cktrue, 1);
++    PK11_SETATTRS(&template[4], CKA_VERIFY, &cktrue, 1);
++
++    key.data = key_material + 0;
++    pwSpec->client.write_mac_key =
++	    PK11_ImportSymKeyWithTemplate(slot, CKM_GOST28147_MAC,
++	    PK11_OriginDerive, CK_FALSE, template, 5, &key, pwArg);
++    if (pwSpec->client.write_mac_key == NULL ) {
++	goto loser;	/* loser sets err */
++    }
++
++    key.data = key_material + 32;
++    pwSpec->server.write_mac_key =
++	    PK11_ImportSymKeyWithTemplate(slot, CKM_GOST28147_MAC,
++	    PK11_OriginDerive, CK_FALSE, template, 5, &key, pwArg);
++    if (pwSpec->server.write_mac_key == NULL ) {
++	goto loser;	/* loser sets err */
++    }
++
++    PK11_SETATTRS(&template[3], CKA_ENCRYPT, &cktrue, 1);
++    PK11_SETATTRS(&template[4], CKA_DECRYPT, &cktrue, 1);
++
++    key.data = key_material + 64;
++    pwSpec->client.write_key =
++	    PK11_ImportSymKeyWithTemplate(slot, CKM_GOST28147,
++	    PK11_OriginDerive, CK_FALSE, template, 5, &key, pwArg);
++    if (pwSpec->client.write_key == NULL ) {
++	goto loser;	/* loser sets err */
++    }
++
++    key.data = key_material + 96;
++    pwSpec->server.write_key =
++	    PK11_ImportSymKeyWithTemplate(slot, CKM_GOST28147,
++	    PK11_OriginDerive, CK_FALSE, template, 5, &key, pwArg);
++    if (pwSpec->server.write_key == NULL ) {
++	goto loser;	/* loser sets err */
++    }
++
++    PORT_Memcpy(pwSpec->client.write_iv, key_material + 128, 8);
++    PORT_Memcpy(pwSpec->server.write_iv, key_material + 136, 8);
++
++    PORT_Memset(key_material, 0, sizeof(key_material));
++    PK11_FreeSlot(slot);
++    return SECSuccess;
++
++loser:
++    if (slot) PK11_FreeSlot(slot);
++
++    PORT_Memset(key_material, 0, sizeof(key_material));
++    ssl_MapLowLevelError(SSL_ERROR_SESSION_KEY_GEN_FAILURE);
++    return SECFailure;
++}
++
+ static SECStatus 
+ ssl3_RestartHandshakeHashes(sslSocket *ss)
+ {
+     SECStatus rv = SECSuccess;
+ 
+     if (ss->opt.bypassPKCS11) {
+ 	ss->ssl3.hs.messages.len = 0;
+ 	MD5_Begin((MD5Context *)ss->ssl3.hs.md5_cx);
+@@ -3114,61 +3352,82 @@ ssl3_RestartHandshakeHashes(sslSocket *s
+ 	    ssl_MapLowLevelError(SSL_ERROR_MD5_DIGEST_FAILURE);
+ 	    return rv;
+ 	}
+ 	rv = PK11_DigestBegin(ss->ssl3.hs.sha);
+ 	if (rv != SECSuccess) {
+ 	    ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
+ 	    return rv;
+ 	}
++	if (ss->ssl3.hs.gost) {
++	    rv = PK11_DigestBegin(ss->ssl3.hs.gost);
++	    if (rv != SECSuccess) {
++	        /*
++		 * no specific error value for GOST digest,
++		 * but we dont really need it
++		 */
++	        ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
++	        return rv;
++	    }
++	}
+     }
+     return rv;
+ }
+ 
+ static SECStatus
+ ssl3_NewHandshakeHashes(sslSocket *ss)
+ {
+     PK11Context *md5  = NULL;
+     PK11Context *sha  = NULL;
++    PK11Context *gost = NULL;
+ 
+     /*
+      * note: We should probably lookup an SSL3 slot for these
+      * handshake hashes in hopes that we wind up with the same slots
+      * that the master secret will wind up in ...
+      */
+     SSL_TRC(30,("%d: SSL3[%d]: start handshake hashes", SSL_GETPID(), ss->fd));
+     if (ss->opt.bypassPKCS11) {
+ 	PORT_Assert(!ss->ssl3.hs.messages.buf && !ss->ssl3.hs.messages.space);
+ 	ss->ssl3.hs.messages.buf = NULL;
+ 	ss->ssl3.hs.messages.space = 0;
+     } else {
+ 	ss->ssl3.hs.md5 = md5 = PK11_CreateDigestContext(SEC_OID_MD5);
+ 	ss->ssl3.hs.sha = sha = PK11_CreateDigestContext(SEC_OID_SHA1);
++	ss->ssl3.hs.gost = gost = PK11_CreateDigestContext(SEC_OID_GOSTR3411);
+ 	if (md5 == NULL) {
+ 	    ssl_MapLowLevelError(SSL_ERROR_MD5_DIGEST_FAILURE);
+ 	    goto loser;
+ 	}
+ 	if (sha == NULL) {
+ 	    ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
+ 	    goto loser;
+ 	}
++	if (gost == NULL) {
++	    /* not fatal */
++	    SSL_TRC(3, ("Failed to create GOST R34.11-94 Hash"));
++	}
+     }
+     if (SECSuccess == ssl3_RestartHandshakeHashes(ss)) {
+ 	return SECSuccess;
+     }
+ 
+ loser:
+     if (md5 != NULL) {
+     	PK11_DestroyContext(md5, PR_TRUE);
+ 	ss->ssl3.hs.md5 = NULL;
+     }
+     if (sha != NULL) {
+     	PK11_DestroyContext(sha, PR_TRUE);
+ 	ss->ssl3.hs.sha = NULL;
+     }
++    if (gost != NULL) {
++    	PK11_DestroyContext(gost, PR_TRUE);
++	ss->ssl3.hs.gost = NULL;
++    }
+     return SECFailure;
+ 
+ }
+ 
+ /*
+  * Handshake messages
+  */
+ /* Called from	ssl3_AppendHandshake()
+@@ -3199,16 +3458,23 @@ ssl3_UpdateHandshakeHashes(sslSocket *ss
+ 	ssl_MapLowLevelError(SSL_ERROR_MD5_DIGEST_FAILURE);
+ 	return rv;
+     }
+     rv = PK11_DigestOp(ss->ssl3.hs.sha, b, l);
+     if (rv != SECSuccess) {
+ 	ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
+ 	return rv;
+     }
++    if (ss->ssl3.hs.gost) {
++        rv = PK11_DigestOp(ss->ssl3.hs.gost, b, l);
++        if (rv != SECSuccess) {
++	    ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
++	    return rv;
++        }
++    }
+     return rv;
+ }
+ 
+ /**************************************************************************
+  * Append Handshake functions.
+  * All these functions set appropriate error codes.
+  * Most rely on ssl3_AppendHandshake to set the error code.
+  **************************************************************************/
+@@ -3531,21 +3797,24 @@ ssl3_ComputeHandshakeHashes(sslSocket * 
+ 
+ 	rv = SECSuccess;
+ #undef md5cx
+ #undef shacx
+     } else {
+ 	/* compute hases with PKCS11 */
+ 	PK11Context * md5;
+ 	PK11Context * sha       = NULL;
++	PK11Context * gost      = NULL;
+ 	unsigned char *md5StateBuf = NULL;
+ 	unsigned char *shaStateBuf = NULL;
+-	unsigned int  md5StateLen, shaStateLen;
++	unsigned char *gostStateBuf = NULL;
++	unsigned int  md5StateLen, shaStateLen, gostStateLen;
+ 	unsigned char md5StackBuf[256];
+ 	unsigned char shaStackBuf[512];
++	unsigned char gostStackBuf[1024];
+ 
+ 	if (!spec->master_secret) {
+ 	    PORT_SetError(SSL_ERROR_RX_UNEXPECTED_HANDSHAKE);
+ 	    return SECFailure;
+ 	}
+ 
+ 	md5StateBuf = PK11_SaveContextAlloc(ss->ssl3.hs.md5, md5StackBuf,
+ 					    sizeof md5StackBuf, &md5StateLen);
+@@ -3558,16 +3827,26 @@ ssl3_ComputeHandshakeHashes(sslSocket * 
+ 	shaStateBuf = PK11_SaveContextAlloc(ss->ssl3.hs.sha, shaStackBuf,
+ 					    sizeof shaStackBuf, &shaStateLen);
+ 	if (shaStateBuf == NULL) {
+ 	    ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
+ 	    goto loser;
+ 	}
+ 	sha = ss->ssl3.hs.sha;
+ 
++	if (ss->ssl3.hs.gost) {
++	    gostStateBuf = PK11_SaveContextAlloc(ss->ssl3.hs.gost,
++	            gostStackBuf, sizeof gostStackBuf, &gostStateLen);
++	    if (gostStateBuf == NULL) {
++	        ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
++	        goto loser;
++	    }
++	    gost = ss->ssl3.hs.gost;
++	}
++
+ 	if (!isTLS) {
+ 	    /* compute hashes for SSL3. */
+ 	    unsigned char s[4];
+ 
+ 	    s[0] = (unsigned char)(sender >> 24);
+ 	    s[1] = (unsigned char)(sender >> 16);
+ 	    s[2] = (unsigned char)(sender >> 8);
+ 	    s[3] = (unsigned char)sender;
+@@ -3646,16 +3925,28 @@ ssl3_ComputeHandshakeHashes(sslSocket * 
+ 	if (rv != SECSuccess) {
+ 	    ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
+ 	    rv = SECFailure;
+ 	    goto loser;
+ 	}
+ 
+ 	PRINT_BUF(60, (NULL, "SHA outer: result", hashes->sha, SHA1_LENGTH));
+ 
++	if (gost) {
++	    rv |= PK11_DigestFinal(gost, hashes->gost, &outLength, 32);
++	    PORT_Assert(rv != SECSuccess || outLength == 32);
++	    if (rv != SECSuccess) {
++	        ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
++	        rv = SECFailure;
++	        goto loser;
++	    }
++
++	    PRINT_BUF(60, (NULL, "GOSTR3411 outer: result", hashes->gost, 32));
++	}
++
+ 	rv = SECSuccess;
+ 
+     loser:
+ 	if (md5StateBuf) {
+ 	    if (PK11_RestoreContext(ss->ssl3.hs.md5, md5StateBuf, md5StateLen)
+ 		 != SECSuccess) 
+ 	    {
+ 		ssl_MapLowLevelError(SSL_ERROR_MD5_DIGEST_FAILURE);
+@@ -3671,16 +3962,27 @@ ssl3_ComputeHandshakeHashes(sslSocket * 
+ 	    {
+ 		ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
+ 		rv = SECFailure;
+ 	    }
+ 	    if (shaStateBuf != shaStackBuf) {
+ 		PORT_ZFree(shaStateBuf, shaStateLen);
+ 	    }
+ 	}
++	if (ss->ssl3.hs.gost && gostStateBuf) {
++	    if (PK11_RestoreContext(ss->ssl3.hs.gost, gostStateBuf, gostStateLen)
++		 != SECSuccess) 
++	    {
++		ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
++		rv = SECFailure;
++	    }
++	    if (gostStateBuf != gostStackBuf) {
++		PORT_ZFree(gostStateBuf, gostStateLen);
++	    }
++	}
+     }
+     return rv;
+ }
+ 
+ /*
+  * SSL 2 based implementations pass in the initial outbound buffer
+  * so that the handshake hash can contain the included information.
+  *
+@@ -4096,16 +4398,17 @@ static const CK_MECHANISM_TYPE wrapMecha
+     CKM_RC5_ECB,
+     CKM_RC2_ECB,
+     CKM_CDMF_ECB,
+     CKM_SKIPJACK_WRAP,
+     CKM_SKIPJACK_CBC64,
+     CKM_AES_ECB,
+     CKM_CAMELLIA_ECB,
+     CKM_SEED_ECB,
++    CKM_GOST28147_ECB,
+     UNKNOWN_WRAP_MECHANISM
+ };
+ 
+ static int
+ ssl_FindIndexByWrapMechanism(CK_MECHANISM_TYPE mech)
+ {
+     const CK_MECHANISM_TYPE *pMech = wrapMechanismList;
+ 
+@@ -4142,16 +4445,17 @@ ssl_UnwrapSymWrappingKey(
+     wrappedKey.type = siBuffer;
+     wrappedKey.data = pWswk->wrappedSymmetricWrappingkey;
+     wrappedKey.len  = pWswk->wrappedSymKeyLen;
+     PORT_Assert(wrappedKey.len <= sizeof pWswk->wrappedSymmetricWrappingkey);
+ 
+     switch (exchKeyType) {
+ 
+     case kt_rsa:
++    case kt_gost:
+ 	unwrappedWrappingKey =
+ 	    PK11_PubUnwrapSymKey(svrPrivKey, &wrappedKey,
+ 				 masterWrapMech, CKA_UNWRAP, 0);
+ 	break;
+ 
+ #ifdef NSS_ENABLE_ECC
+     case kt_ecdh:
+         /* 
+@@ -4375,16 +4679,22 @@ getWrappingKey( sslSocket *       ss,
+ #endif /* NSS_ENABLE_ECC */
+ 
+     case kt_rsa:
+ 	asymWrapMechanism = CKM_RSA_PKCS;
+ 	rv = PK11_PubWrapSymKey(asymWrapMechanism, svrPubKey,
+ 	                        unwrappedWrappingKey, &wrappedKey);
+ 	break;
+ 
++    case kt_gost:
++	asymWrapMechanism = CKM_GOSTR3410_KEY_WRAP;
++	rv = PK11_PubWrapSymKey(asymWrapMechanism, svrPubKey,
++	                        unwrappedWrappingKey, &wrappedKey);
++	break;
++
+ #ifdef NSS_ENABLE_ECC
+     case kt_ecdh:
+ 	/*
+ 	 * We generate an ephemeral EC key pair. Perform an ECDH
+ 	 * computation involving this ephemeral EC public key and
+ 	 * the SSL server's (long-term) EC private key. The resulting
+ 	 * shared secret is treated in the same way as Fortezza's Ks, 
+ 	 * i.e., it is used to wrap the wrapping key. To facilitate
+@@ -4624,16 +4934,155 @@ loser:
+ 	PORT_Free(enc_pms.data);
+     }
+     if (pms != NULL) {
+     	PK11_FreeSymKey(pms);
+     }
+     return rv;
+ }
+ 
++static unsigned char gost28147_default_params[] =
++        { 0x06, 0x07, 0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x01 };
++static SECStatus
++sendGOSTClientKeyExchange(sslSocket * ss, SECKEYPublicKey * svrPubKey)
++{
++    PK11SymKey *pms = NULL;
++    SECStatus rv = SECFailure;
++    unsigned char *   cr     = (unsigned char *)&ss->ssl3.hs.client_random;
++    unsigned char *   sr     = (unsigned char *)&ss->ssl3.hs.server_random;
++    CK_BYTE ukm[32];
++    unsigned int outLength;
++    CK_GOSTR3410_KEY_WRAP_PARAMS gostR3410WrapParams;
++    SECItem wrapParams;
++    SECItem enc_pms = {siBuffer, NULL, 0};
++    SECItem *msg = NULL;
++    SECItem **key_trans_blobs = NULL;
++    PK11Context *hash = NULL;
++
++    PORT_Assert( ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss) );
++    PORT_Assert( ss->opt.noLocks || ssl_HaveXmitBufLock(ss));
++
++    if (ss->ssl3.pwSpec->version <= SSL_LIBRARY_VERSION_3_0) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++
++    /* Generate the pre-master secret ...  */
++    ssl_GetSpecWriteLock(ss);
++
++    pms = ssl3_GenerateGOSTPMS(ss, ss->ssl3.pwSpec, NULL);
++    ssl_ReleaseSpecWriteLock(ss);
++    if (pms == NULL) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++
++    /* Get the wrapped (encrypted) pre-master secret, enc_pms */
++    enc_pms.len  = 1024; /* should be enough */
++    enc_pms.data = (unsigned char*)PORT_Alloc(enc_pms.len);
++    if (enc_pms.data == NULL) {
++	goto loser;	/* err set by PORT_Alloc */
++    }
++
++    /* we should first compute ukm, then wrap with parameters */
++    hash = PK11_CreateDigestContext(SEC_OID_GOSTR3411);
++    if (!hash) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++    rv = PK11_DigestOp(hash,cr, SSL3_RANDOM_LENGTH);
++    rv |= PK11_DigestOp(hash, sr, SSL3_RANDOM_LENGTH);
++    rv |= PK11_DigestFinal(hash, ukm, &outLength, sizeof(ukm));
++    if (rv != SECSuccess) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++
++    /* wrap pre-master secret in server's public key. */
++    gostR3410WrapParams.pWrapOID = gost28147_default_params;
++    gostR3410WrapParams.ulWrapOIDLen = sizeof(gost28147_default_params);
++    gostR3410WrapParams.pUKM = ukm;
++    gostR3410WrapParams.ulUKMLen = 8;
++    gostR3410WrapParams.hKey = CK_INVALID_HANDLE;
++    wrapParams.data = (unsigned char *)&gostR3410WrapParams;
++    wrapParams.len = sizeof(gostR3410WrapParams);
++    rv = PK11_PubWrapSymKeyRaw(CKM_GOSTR3410_KEY_WRAP, &wrapParams,
++            svrPubKey, pms, &enc_pms);
++    if (rv != SECSuccess) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++
++#if defined(TRACE)
++    if (ssl_trace >= 100 || ssl_keylog_iob) {
++	SECStatus extractRV = PK11_ExtractKeyValue(pms);
++	if (extractRV == SECSuccess) {
++	    SECItem * keyData = PK11_GetKeyData(pms);
++	    if (keyData && keyData->data && keyData->len) {
++		if (ssl_trace >= 100) {
++		    ssl_PrintBuf(ss, "Pre-Master Secret",
++				 keyData->data, keyData->len);
++		}
++		}
++	}
++    }
++#endif
++
++    rv = ssl3_InitPendingCipherSpec(ss,  pms);
++    PK11_FreeSymKey(pms); pms = NULL;
++
++    if (rv != SECSuccess) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++
++    key_trans_blobs = (SECItem **)PORT_ZAlloc(2 * sizeof(SECItem *));
++    if (!key_trans_blobs) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++    key_trans_blobs[0] = &enc_pms;
++
++    msg = SEC_ASN1EncodeItem(NULL, NULL, &key_trans_blobs,
++            SEC_ASN1_GET(SEC_SequenceOfAnyTemplate));
++    if (!msg) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++	goto loser;
++    }
++
++    rv = ssl3_AppendHandshakeHeader(ss, client_key_exchange, msg->len);
++    if (rv != SECSuccess) {
++	goto loser;	/* err set by ssl3_AppendHandshake* */
++    }
++    rv = ssl3_AppendHandshake(ss, msg->data, msg->len);
++    if (rv != SECSuccess) {
++	goto loser;	/* err set by ssl3_AppendHandshake* */
++    }
++
++    rv = SECSuccess;
++
++loser:
++    if (enc_pms.data != NULL) {
++	PORT_Free(enc_pms.data);
++    }
++    if (key_trans_blobs != NULL) {
++	PORT_Free(key_trans_blobs);
++    }
++    if (msg != NULL) {
++    	SECITEM_FreeItem(msg, PR_TRUE);
++    }
++    if (pms != NULL) {
++    	PK11_FreeSymKey(pms);
++    }
++    if (hash != NULL) {
++        PK11_DestroyContext(hash, PR_TRUE);
++    }
++    return rv;
++}
++
+ /* Called from ssl3_SendClientKeyExchange(). */
+ /* Presently, this always uses PKCS11.  There is no bypass for this. */
+ static SECStatus
+ sendDHClientKeyExchange(sslSocket * ss, SECKEYPublicKey * svrPubKey)
+ {
+     PK11SymKey *	pms 		= NULL;
+     SECStatus           rv    		= SECFailure;
+     PRBool              isTLS;
+@@ -4777,16 +5226,20 @@ ssl3_SendClientKeyExchange(sslSocket *ss
+ 	break;
+ 
+ #ifdef NSS_ENABLE_ECC
+     case kt_ecdh:
+ 	rv = ssl3_SendECDHClientKeyExchange(ss, serverKey);
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    case kt_gost:
++	rv = sendGOSTClientKeyExchange(ss, serverKey);
++	break;
++
+     default:
+ 	/* got an unknown or unsupported Key Exchange Algorithm.  */
+ 	SEND_ALERT
+ 	PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+ 	break;
+     }
+ 
+     SSL_TRC(3, ("%d: SSL3[%d]: DONE sending client_key_exchange",
+@@ -4836,17 +5289,18 @@ ssl3_SendCertificateVerify(sslSocket *ss
+ 	sid->u.ssl3.clAuthModuleID   = PK11_GetModuleID(slot);
+ 	sid->u.ssl3.clAuthValid      = PR_TRUE;
+ 	PK11_FreeSlot(slot);
+     }
+     /* If we're doing RSA key exchange, we're all done with the private key
+      * here.  Diffie-Hellman key exchanges need the client's
+      * private key for the key exchange.
+      */
+-    if (ss->ssl3.hs.kea_def->exchKeyType == kt_rsa) {
++    if (ss->ssl3.hs.kea_def->exchKeyType == kt_rsa ||
++            ss->ssl3.hs.kea_def->exchKeyType == kt_gost) {
+ 	SECKEY_DestroyPrivateKey(ss->ssl3.clientPrivateKey);
+ 	ss->ssl3.clientPrivateKey = NULL;
+     }
+     if (rv != SECSuccess) {
+ 	goto done;	/* err code was set by ssl3_SignHashes */
+     }
+ 
+     rv = ssl3_AppendHandshakeHeader(ss, certificate_verify, buf.len + 2);
+@@ -7386,16 +7840,122 @@ double_bypass:
+ 
+     if (rv != SECSuccess) {
+ 	SEND_ALERT
+ 	return SECFailure; /* error code set by ssl3_InitPendingCipherSpec */
+     }
+     return SECSuccess;
+ }
+ 
++static PK11SymKey *
++ssl3_GenerateGOSTPMS(sslSocket *ss, ssl3CipherSpec *spec,
++                    PK11SlotInfo * serverKeySlot)
++{
++    PK11SymKey *      pms		= NULL;
++    PK11SlotInfo *    slot		= serverKeySlot;
++    void *	      pwArg 		= ss->pkcs11PinArg;
++    CK_MECHANISM_TYPE mechanism_array[3];
++
++    PORT_Assert( ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss) );
++
++    if (slot == NULL) {
++	SSLCipherAlgorithm calg;
++	/* The specReadLock would suffice here, but we cannot assert on
++	** read locks.  Also, all the callers who call with a non-null
++	** slot already hold the SpecWriteLock.
++	*/
++	PORT_Assert(ss->opt.noLocks || ssl_HaveSpecWriteLock(ss));
++	PORT_Assert(ss->ssl3.prSpec == ss->ssl3.pwSpec);
++
++	calg = spec->cipher_def->calg;
++	PORT_Assert(alg2Mech[calg].calg == calg);
++
++	/* First get an appropriate slot.  */
++	mechanism_array[0] = CKM_GENERIC_SECRET_KEY_GEN;
++	mechanism_array[1] = CKM_GOSTR3410_KEY_WRAP;
++	mechanism_array[2] = alg2Mech[calg].cmech;
++
++	slot = PK11_GetBestSlotMultiple(mechanism_array, 3, pwArg);
++	if (slot == NULL) {
++	  PORT_SetError(SSL_ERROR_TOKEN_SLOT_NOT_FOUND);
++	  return pms;	/* which is NULL */
++	}
++    }
++
++    pms = PK11_TokenKeyGenWithFlags(slot, CKM_GENERIC_SECRET_KEY_GEN,
++            NULL, 32, NULL, CKF_SIGN, PK11_ATTR_EXTRACTABLE, pwArg);
++    if (!serverKeySlot)
++	PK11_FreeSlot(slot);
++    if (pms == NULL) {
++	ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++    }
++    return pms;
++}
++
++static SECStatus
++ssl3_HandleGOSTClientKeyExchange(sslSocket *ss,
++                                SSL3Opaque *b,
++				PRUint32 length,
++				SECKEYPrivateKey *serverKey)
++{
++    PK11SymKey *      pms;
++    SECStatus         rv;
++    SECItem           enc_pms;
++    SECItem         **key_trans_blobs = NULL;
++    PRArenaPool * arena = ss->ssl3.peerCertArena;
++
++    PORT_Assert( ss->opt.noLocks || ssl_HaveRecvBufLock(ss) );
++    PORT_Assert( ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss) );
++
++    enc_pms.data = b;
++    enc_pms.len  = length;
++
++    rv = SEC_ASN1DecodeItem(arena, &key_trans_blobs,
++            SEC_ASN1_GET(SEC_SequenceOfAnyTemplate), &enc_pms);
++    if (rv != SECSuccess || !key_trans_blobs || !key_trans_blobs[0]) {
++        PORT_SetError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++        return SECFailure;
++    }
++
++    /*
++     * XXX with PK11_PubUnwrapSymKey we can handle only key blobs
++     * with ephemeral keys.
++     */
++    pms = PK11_PubUnwrapSymKey(serverKey, key_trans_blobs[0],
++				   CKM_GOSTR3411_HMAC, CKA_SIGN, 0);
++    if (pms != NULL) {
++        PRINT_BUF(60, (ss, "decrypted premaster secret:",
++			   PK11_GetKeyData(pms)->data,
++			   PK11_GetKeyData(pms)->len));
++    } else {
++        /* unwrap failed. Generate a bogus PMS and carry on. */
++        PK11SlotInfo *  slot   = PK11_GetSlotFromPrivateKey(serverKey);
++
++        ssl_GetSpecWriteLock(ss);
++        pms = ssl3_GenerateGOSTPMS(ss, ss->ssl3.prSpec, slot);
++        ssl_ReleaseSpecWriteLock(ss);
++        PK11_FreeSlot(slot);
++    }
++
++    if (pms == NULL) {
++        ssl_MapLowLevelError(SSL_ERROR_CLIENT_KEY_EXCHANGE_FAILURE);
++        return SECFailure;
++    }
++
++    /* This step will derive the MS from the PMS, among other things. */
++    rv = ssl3_InitPendingCipherSpec(ss,  pms);
++    PK11_FreeSymKey(pms);
++
++    if (rv != SECSuccess) {
++	SEND_ALERT
++	return SECFailure; /* error code set by ssl3_InitPendingCipherSpec */
++    }
++    return SECSuccess;
++}
++
+ 
+ /* Called from ssl3_HandleHandshakeMessage() when it has deciphered a complete
+  * ssl3 ClientKeyExchange message from the remote client
+  * Caller must hold Handshake and RecvBuf locks.
+  */
+ static SECStatus
+ ssl3_HandleClientKeyExchange(sslSocket *ss, SSL3Opaque *b, PRUint32 length)
+ {
+@@ -7500,16 +8060,24 @@ skip:
+ 	rv = ssl3_HandleECDHClientKeyExchange(ss, b, length, 
+ 					      serverPubKey, serverKey);
+ 	if (rv != SECSuccess) {
+ 	    return SECFailure;	/* error code set */
+ 	}
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    case kt_gost:
++	rv = ssl3_HandleGOSTClientKeyExchange(ss, b, length, serverKey);
++	if (rv != SECSuccess) {
++	    SEND_ALERT
++	    return SECFailure;	/* error code set */
++	}
++	break;
++
+     default:
+ 	(void) ssl3_HandshakeFailure(ss);
+ 	PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+ 	return SECFailure;
+     }
+     ss->ssl3.hs.ws = ss->sec.peerCert ? wait_cert_verify : wait_change_cipher;
+     return SECSuccess;
+ 
+@@ -8140,39 +8708,112 @@ ssl3_ComputeTLSFinished(ssl3CipherSpec *
+ 	PK11Context *prf_context =
+ 	    PK11_CreateContextBySymKey(CKM_TLS_PRF_GENERAL, CKA_SIGN, 
+ 				       spec->master_secret, &param);
+ 	if (!prf_context)
+ 	    return SECFailure;
+ 
+ 	rv  = PK11_DigestBegin(prf_context);
+ 	rv |= PK11_DigestOp(prf_context, (const unsigned char *) label, len);
+-	rv |= PK11_DigestOp(prf_context, hashes->md5, sizeof *hashes);
++	rv |= PK11_DigestOp(prf_context, hashes->md5,
++	        sizeof(hashes->md5) + sizeof(hashes->sha));
+ 	rv |= PK11_DigestFinal(prf_context, tlsFinished->verify_data, 
+ 			       &len, sizeof tlsFinished->verify_data);
+ 	PORT_Assert(rv != SECSuccess || len == sizeof *tlsFinished);
+ 
+ 	PK11_DestroyContext(prf_context, PR_TRUE);
+     } else {
+ 	/* bypass PKCS11 */
+ 	SECItem inData  = { siBuffer, };
+ 	SECItem outData = { siBuffer, };
+ 	PRBool isFIPS   = PR_FALSE;
+ 
+ 	inData.data  = (unsigned char *)hashes->md5;
+-	inData.len   = sizeof hashes[0];
++	inData.len   = sizeof(hashes->md5) + sizeof(hashes->sha);
+ 	outData.data = tlsFinished->verify_data;
+ 	outData.len  = sizeof tlsFinished->verify_data;
+ 	rv = TLS_PRF(&spec->msItem, label, &inData, &outData, isFIPS);
+ 	PORT_Assert(rv != SECSuccess || \
+ 		    outData.len == sizeof tlsFinished->verify_data);
+     }
+     return rv;
+ }
+ 
++static SECStatus
++ssl3_TLS_PRFGOST(PK11SymKey *key,
++		const char *label, unsigned int label_len,
++		const unsigned char *seed, unsigned int seed_len,
++		unsigned char *out, unsigned int out_len)
++{
++    unsigned int  len = 0;
++    unsigned char a[32];
++    unsigned int  a_len = 0;
++    unsigned char block[32];
++    unsigned int  block_len = 0;
++    SECItem       param = {siBuffer, NULL, 0};
++    SECStatus     rv = SECSuccess;
++    PK11Context *prf_context =
++        PK11_CreateContextBySymKey(CKM_GOSTR3411_HMAC, CKA_SIGN, 
++                       key, &param);
++    if (!prf_context)
++        return SECFailure;
++
++    do {
++        rv  = PK11_DigestBegin(prf_context);
++        if (len) {
++            rv |= PK11_DigestOp(prf_context, a, sizeof(a));
++        } else {
++            rv |= PK11_DigestOp(prf_context,
++	            (const unsigned char *)label, label_len);
++            rv |= PK11_DigestOp(prf_context, seed, seed_len);
++        }
++        rv |= PK11_DigestFinal(prf_context, a, &a_len, sizeof(a));
++        if (rv != SECSuccess)
++            goto end;
++        rv  = PK11_DigestBegin(prf_context);
++        rv |= PK11_DigestOp(prf_context, a, sizeof(a));
++        rv |= PK11_DigestOp(prf_context,
++	        (const unsigned char *)label, label_len);
++        rv |= PK11_DigestOp(prf_context, seed, seed_len);
++        rv |= PK11_DigestFinal(prf_context, block, &block_len, sizeof(block));
++        if (rv != SECSuccess)
++            goto end;
++        if (block_len + len > out_len)
++            block_len = out_len - len;
++        PORT_Memcpy(out + len, block, block_len);
++        len += block_len;
++    } while (len < out_len);
++
++end:
++    PK11_DestroyContext(prf_context, PR_TRUE);
++    return rv;
++}
++
++static SECStatus
++ssl3_ComputeGOSTTLSFinished(ssl3CipherSpec *spec,
++			PRBool          isServer,
++                const   SSL3Finished *  hashes,
++                        TLSFinished  *  tlsFinished)
++{
++    const char * label;
++    unsigned int len;
++    SECStatus    rv;
++
++    label = isServer ? "server finished" : "client finished";
++    len   = 15;
++
++    rv = ssl3_TLS_PRFGOST(spec->master_secret, label, len,
++			hashes->gost, sizeof(hashes->gost),
++			tlsFinished->verify_data,
++			sizeof(tlsFinished->verify_data));
++    PORT_Assert(rv == SECSuccess);
++
++    return rv;
++}
++
+ /* called from ssl3_HandleServerHelloDone
+  *             ssl3_HandleClientHello
+  *             ssl3_HandleFinished
+  */
+ static SECStatus
+ ssl3_SendFinished(sslSocket *ss, PRInt32 flags)
+ {
+     ssl3CipherSpec *cwSpec;
+@@ -8188,16 +8829,20 @@ ssl3_SendFinished(sslSocket *ss, PRInt32
+     PORT_Assert( ss->opt.noLocks || ssl_HaveXmitBufLock(ss));
+     PORT_Assert( ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss));
+ 
+     ssl_GetSpecReadLock(ss);
+     cwSpec = ss->ssl3.cwSpec;
+     isTLS = (PRBool)(cwSpec->version > SSL_LIBRARY_VERSION_3_0);
+     rv = ssl3_ComputeHandshakeHashes(ss, cwSpec, &hashes, sender);
+     if (isTLS && rv == SECSuccess) {
++	if (ss->ssl3.hs.kea_def->exchKeyType == kt_gost)
++	    rv = ssl3_ComputeGOSTTLSFinished(cwSpec, isServer,
++	            &hashes, &tlsFinished);
++	else
+ 	rv = ssl3_ComputeTLSFinished(cwSpec, isServer, &hashes, &tlsFinished);
+     }
+     ssl_ReleaseSpecReadLock(ss);
+     if (rv != SECSuccess) {
+ 	goto fail;	/* err code was set by ssl3_ComputeHandshakeHashes */
+     }
+ 
+     if (isTLS) {
+@@ -8212,21 +8857,22 @@ ssl3_SendFinished(sslSocket *ss, PRInt32
+ 	rv = ssl3_AppendHandshake(ss, &tlsFinished, sizeof tlsFinished);
+ 	if (rv != SECSuccess) 
+ 	    goto fail; 		/* err set by AppendHandshake. */
+     } else {
+ 	if (isServer)
+ 	    ss->ssl3.hs.finishedMsgs.sFinished[1] = hashes;
+ 	else
+ 	    ss->ssl3.hs.finishedMsgs.sFinished[0] = hashes;
+-	ss->ssl3.hs.finishedBytes = sizeof hashes;
+-	rv = ssl3_AppendHandshakeHeader(ss, finished, sizeof hashes);
++	ss->ssl3.hs.finishedBytes = sizeof(hashes.md5) + sizeof(hashes.sha);
++	rv = ssl3_AppendHandshakeHeader(ss, finished,
++	        sizeof(hashes.md5) + sizeof(hashes.sha));
+ 	if (rv != SECSuccess) 
+ 	    goto fail; 		/* err set by AppendHandshake. */
+-	rv = ssl3_AppendHandshake(ss, &hashes, sizeof hashes);
++	rv = ssl3_AppendHandshake(ss, &hashes, sizeof(hashes.md5) + sizeof(hashes.sha));
+ 	if (rv != SECSuccess) 
+ 	    goto fail; 		/* err set by AppendHandshake. */
+     }
+     rv = ssl3_FlushHandshake(ss, flags);
+     if (rv != SECSuccess) {
+ 	goto fail;	/* error code set by ssl3_FlushHandshake */
+     }
+     return SECSuccess;
+@@ -8349,41 +8995,45 @@ ssl3_HandleFinished(sslSocket *ss, SSL3O
+     if (isTLS) {
+ 	TLSFinished tlsFinished;
+ 
+ 	if (length != sizeof tlsFinished) {
+ 	    (void)SSL3_SendAlert(ss, alert_fatal, decode_error);
+ 	    PORT_SetError(SSL_ERROR_RX_MALFORMED_FINISHED);
+ 	    return SECFailure;
+ 	}
++	if (ss->ssl3.hs.kea_def->exchKeyType == kt_gost)
++	    rv = ssl3_ComputeGOSTTLSFinished(ss->ssl3.crSpec, !isServer, 
++	                             hashes, &tlsFinished);
++	else
+ 	rv = ssl3_ComputeTLSFinished(ss->ssl3.crSpec, !isServer, 
+ 	                             hashes, &tlsFinished);
+ 	if (!isServer)
+ 	    ss->ssl3.hs.finishedMsgs.tFinished[1] = tlsFinished;
+ 	else
+ 	    ss->ssl3.hs.finishedMsgs.tFinished[0] = tlsFinished;
+ 	ss->ssl3.hs.finishedBytes = sizeof tlsFinished;
+ 	if (rv != SECSuccess ||
+ 	    0 != NSS_SecureMemcmp(&tlsFinished, b, length)) {
+ 	    (void)SSL3_SendAlert(ss, alert_fatal, decrypt_error);
+ 	    PORT_SetError(SSL_ERROR_BAD_HANDSHAKE_HASH_VALUE);
+ 	    return SECFailure;
+ 	}
+     } else {
+-	if (length != sizeof(SSL3Hashes)) {
++	if (length != sizeof(hashes->md5) + sizeof(hashes->sha)) {
+ 	    (void)ssl3_IllegalParameter(ss);
+ 	    PORT_SetError(SSL_ERROR_RX_MALFORMED_FINISHED);
+ 	    return SECFailure;
+ 	}
+ 
+ 	if (!isServer)
+ 	    ss->ssl3.hs.finishedMsgs.sFinished[1] = *hashes;
+ 	else
+ 	    ss->ssl3.hs.finishedMsgs.sFinished[0] = *hashes;
+-	ss->ssl3.hs.finishedBytes = sizeof *hashes;
++	ss->ssl3.hs.finishedBytes = sizeof(hashes->md5) + sizeof(hashes->sha);
+ 	if (0 != NSS_SecureMemcmp(hashes, b, length)) {
+ 	    (void)ssl3_HandshakeFailure(ss);
+ 	    PORT_SetError(SSL_ERROR_BAD_HANDSHAKE_HASH_VALUE);
+ 	    return SECFailure;
+ 	}
+     }
+ 
+     doStepUp = (PRBool)(!isServer && ss->ssl3.hs.rehandshake);
+@@ -9468,16 +10118,19 @@ ssl3_DestroySSL3Info(sslSocket *ss)
+ 	MD5_DestroyContext((MD5Context *)ss->ssl3.hs.md5_cx, PR_FALSE);
+     } 
+     if (ss->ssl3.hs.md5) {
+ 	PK11_DestroyContext(ss->ssl3.hs.md5,PR_TRUE);
+     }
+     if (ss->ssl3.hs.sha) {
+ 	PK11_DestroyContext(ss->ssl3.hs.sha,PR_TRUE);
+     }
++    if (ss->ssl3.hs.gost) {
++	PK11_DestroyContext(ss->ssl3.hs.gost,PR_TRUE);
++    }
+     if (ss->ssl3.hs.messages.buf) {
+     	PORT_Free(ss->ssl3.hs.messages.buf);
+ 	ss->ssl3.hs.messages.buf = NULL;
+ 	ss->ssl3.hs.messages.len = 0;
+ 	ss->ssl3.hs.messages.space = 0;
+     }
+ 
+     /* free the SSL3Buffer (msg_body) */
+diff --git a/security/nss/lib/ssl/ssl3ext.c b/security/nss/lib/ssl/ssl3ext.c
+--- a/security/nss/lib/ssl/ssl3ext.c
++++ b/security/nss/lib/ssl/ssl3ext.c
+@@ -1362,18 +1362,21 @@ ssl3_HandleHelloExtensions(sslSocket *ss
+ 	rv = ssl3_ConsumeHandshakeVariable(ss, &extension_data, 2, b, length);
+ 	if (rv != SECSuccess)
+ 	    return rv;
+ 
+ 	/* Check whether the server sent an extension which was not advertised
+ 	 * in the ClientHello.
+ 	 */
+ 	if (!ss->sec.isServer &&
+-	    !ssl3_ClientExtensionAdvertised(ss, extension_type))
++	    !ssl3_ClientExtensionAdvertised(ss, extension_type)) {
++	    if (extension_type == 65000)
++	        continue; /* XXX CryptoPro TLS bug workaround */
+ 	    return SECFailure;  /* TODO: send unsupported_extension alert */
++	}
+ 
+ 	/* Check whether an extension has been sent multiple times. */
+ 	if (ssl3_ExtensionNegotiated(ss, extension_type))
+ 	    return SECFailure;
+ 
+ 	/* find extension_type in table of Hello Extension Handlers */
+ 	for (handler = handlers; handler->ex_type >= 0; handler++) {
+ 	    /* if found, call this handler */
+diff --git a/security/nss/lib/ssl/ssl3prot.h b/security/nss/lib/ssl/ssl3prot.h
+--- a/security/nss/lib/ssl/ssl3prot.h
++++ b/security/nss/lib/ssl/ssl3prot.h
+@@ -208,16 +208,17 @@ typedef enum {
+     kea_dh_rsa_export,
+     kea_dhe_dss, 
+     kea_dhe_dss_export, 
+     kea_dhe_rsa, 
+     kea_dhe_rsa_export,
+     kea_dh_anon, 
+     kea_dh_anon_export, 
+     kea_rsa_fips,
++    kea_gost,
+     kea_ecdh_ecdsa,
+     kea_ecdhe_ecdsa,
+     kea_ecdh_rsa,
+     kea_ecdhe_rsa,
+     kea_ecdh_anon
+ } SSL3KeyExchangeAlgorithm;
+      
+ typedef struct {
+@@ -236,32 +237,34 @@ typedef struct {
+ 	SSL3ServerDHParams dh;
+ 	SSL3ServerRSAParams rsa;
+     } u;
+ } SSL3ServerParams;
+ 
+ typedef struct {
+     uint8 md5[16];
+     uint8 sha[20];
++    uint8 gost[32];
+ } SSL3Hashes;
+      
+ typedef struct {
+     union {
+ 	SSL3Opaque anonymous;
+ 	SSL3Hashes certified;
+     } u;
+ } SSL3ServerKeyExchange;
+      
+ typedef enum {
+     ct_RSA_sign 	=  1, 
+     ct_DSS_sign 	=  2, 
+     ct_RSA_fixed_DH 	=  3,
+     ct_DSS_fixed_DH 	=  4, 
+     ct_RSA_ephemeral_DH =  5, 
+     ct_DSS_ephemeral_DH =  6,
++    ct_GOSTR3410_sign   =  21,
+     ct_ECDSA_sign	=  64, 
+     ct_RSA_fixed_ECDH	=  65, 
+     ct_ECDSA_fixed_ECDH	=  66 
+ 
+ } SSL3ClientCertificateType;
+      
+ typedef SECItem *SSL3DistinquishedName;
+ 
+@@ -282,16 +285,17 @@ typedef struct {
+ 	SSL3Opaque implicit;
+ 	SECItem    explicit;
+     } dh_public;
+ } SSL3ClientDiffieHellmanPublic;
+      
+ typedef struct {
+     union {
+ 	SSL3EncryptedPreMasterSecret  rsa;
++	SSL3EncryptedPreMasterSecret  gost;
+ 	SSL3ClientDiffieHellmanPublic diffie_helman;
+     } exchange_keys;
+ } SSL3ClientKeyExchange;
+ 
+ typedef SSL3Hashes SSL3PreSignedCertificateVerify;
+ 
+ typedef SECItem SSL3CertificateVerify;
+ 
+diff --git a/security/nss/lib/ssl/sslenum.c b/security/nss/lib/ssl/sslenum.c
+--- a/security/nss/lib/ssl/sslenum.c
++++ b/security/nss/lib/ssl/sslenum.c
+@@ -70,16 +70,18 @@ const PRUint16 SSL_ImplementedCiphers[] 
+     TLS_DHE_DSS_WITH_AES_256_CBC_SHA,
+ #ifdef NSS_ENABLE_ECC
+     TLS_ECDH_RSA_WITH_AES_256_CBC_SHA,
+     TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA,
+ #endif /* NSS_ENABLE_ECC */
+     TLS_RSA_WITH_CAMELLIA_256_CBC_SHA,
+     TLS_RSA_WITH_AES_256_CBC_SHA,
+ 
++    TLS_GOSTR341001_WITH_28147_CNT_IMIT,
++
+     /* 128-bit */
+ #ifdef NSS_ENABLE_ECC
+     TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+     TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+     TLS_ECDHE_RSA_WITH_RC4_128_SHA,
+     TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+ #endif /* NSS_ENABLE_ECC */
+     TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA,
+diff --git a/security/nss/lib/ssl/sslimpl.h b/security/nss/lib/ssl/sslimpl.h
+--- a/security/nss/lib/ssl/sslimpl.h
++++ b/security/nss/lib/ssl/sslimpl.h
+@@ -72,33 +72,36 @@
+ typedef SSLKEAType      SSL3KEAType;
+ typedef SSLMACAlgorithm SSL3MACAlgorithm;
+ typedef SSLSignType     SSL3SignType;
+ 
+ #define sign_null	ssl_sign_null
+ #define sign_rsa	ssl_sign_rsa
+ #define sign_dsa	ssl_sign_dsa
+ #define sign_ecdsa	ssl_sign_ecdsa
++#define sign_gost	ssl_sign_gost
+ 
+ #define calg_null	ssl_calg_null
+ #define calg_rc4	ssl_calg_rc4
+ #define calg_rc2	ssl_calg_rc2
+ #define calg_des	ssl_calg_des
+ #define calg_3des	ssl_calg_3des
+ #define calg_idea	ssl_calg_idea
+ #define calg_fortezza	ssl_calg_fortezza /* deprecated, must preserve */
+ #define calg_aes	ssl_calg_aes
+ #define calg_camellia	ssl_calg_camellia
+ #define calg_seed	ssl_calg_seed
++#define calg_gost	ssl_calg_gost
+ 
+ #define mac_null	ssl_mac_null
+ #define mac_md5 	ssl_mac_md5
+ #define mac_sha 	ssl_mac_sha
+ #define hmac_md5	ssl_hmac_md5
+ #define hmac_sha	ssl_hmac_sha
++#define mac_gost	ssl_mac_gost
+ 
+ #define SET_ERROR_CODE		/* reminder */
+ #define SEND_ALERT		/* reminder */
+ #define TEST_FOR_FAILURE	/* reminder */
+ #define DEAL_WITH_FAILURE	/* reminder */
+ 
+ #if defined(DEBUG) || defined(TRACE)
+ #ifdef __cplusplus
+@@ -161,17 +164,17 @@ typedef enum { SSLAppOpRead = 0,
+ #define SSL_MAX_CYPHER_ARG_BYTES	32
+ 
+ #define SSL_MAX_MAC_BYTES		16
+ 
+ #define SSL3_RSA_PMS_LENGTH 48
+ #define SSL3_MASTER_SECRET_LENGTH 48
+ 
+ /* number of wrap mechanisms potentially used to wrap master secrets. */
+-#define SSL_NUM_WRAP_MECHS              16
++#define SSL_NUM_WRAP_MECHS              17
+ 
+ /* This makes the cert cache entry exactly 4k. */
+ #define SSL_MAX_CACHED_CERT_LEN		4060
+ 
+ #define NUM_MIXERS                      9
+ 
+ /* Mask of the 25 named curves we support. */
+ #ifndef NSS_ECC_MORE_THAN_SUITE_B
+@@ -302,19 +305,19 @@ typedef struct {
+     ssl3CipherSuite cipher_suite;
+     PRUint8         policy;
+     unsigned char   enabled   : 1;
+     unsigned char   isPresent : 1;
+ #endif
+ } ssl3CipherSuiteCfg;
+ 
+ #ifdef NSS_ENABLE_ECC
+-#define ssl_V3_SUITES_IMPLEMENTED 50
++#define ssl_V3_SUITES_IMPLEMENTED 51
+ #else
+-#define ssl_V3_SUITES_IMPLEMENTED 30
++#define ssl_V3_SUITES_IMPLEMENTED 31
+ #endif /* NSS_ENABLE_ECC */
+ 
+ typedef struct sslOptionsStr {
+     unsigned int useSecurity		: 1;  /*  1 */
+     unsigned int useSocks		: 1;  /*  2 */
+     unsigned int requestCertificate	: 1;  /*  3 */
+     unsigned int requireCertificate	: 2;  /*  4-5 */
+     unsigned int handshakeAsClient	: 1;  /*  6 */
+@@ -474,16 +477,17 @@ typedef enum {
+     cipher_3des, 
+     cipher_des40,
+     cipher_idea, 
+     cipher_aes_128,
+     cipher_aes_256,
+     cipher_camellia_128,
+     cipher_camellia_256,
+     cipher_seed,
++    cipher_gost,
+     cipher_missing              /* reserved for no such supported cipher */
+     /* This enum must match ssl3_cipherName[] in ssl3con.c.  */
+ } SSL3BulkCipher;
+ 
+ typedef enum { type_stream, type_block } CipherType;
+ 
+ #define MAX_IV_LENGTH 64
+ 
+@@ -752,16 +756,17 @@ struct TLSExtensionDataStr {
+ typedef struct SSL3HandshakeStateStr {
+     SSL3Random            server_random;
+     SSL3Random            client_random;
+     SSL3WaitState         ws;
+     PRUint64              md5_cx[MAX_MAC_CONTEXT_LLONGS];
+     PRUint64              sha_cx[MAX_MAC_CONTEXT_LLONGS];
+     PK11Context *         md5;            /* handshake running hashes */
+     PK11Context *         sha;
++    PK11Context *         gost;
+ const ssl3KEADef *        kea_def;
+     ssl3CipherSuite       cipher_suite;
+ const ssl3CipherSuiteDef *suite_def;
+     SSLCompressionMethod  compression;
+     sslBuffer             msg_body;    /* protected by recvBufLock */
+                                /* partial handshake message from record layer */
+     unsigned int          header_bytes; 
+                                /* number of bytes consumed from handshake */
+diff --git a/security/nss/lib/ssl/sslinfo.c b/security/nss/lib/ssl/sslinfo.c
+--- a/security/nss/lib/ssl/sslinfo.c
++++ b/security/nss/lib/ssl/sslinfo.c
+@@ -130,54 +130,60 @@ SSL_GetChannelInfo(PRFileDesc *fd, SSLCh
+ 
+ #define CS(x) x, #x
+ #define CK(x) x | 0xff00, #x
+ 
+ #define S_DSA   "DSA", ssl_auth_dsa
+ #define S_RSA	"RSA", ssl_auth_rsa
+ #define S_KEA   "KEA", ssl_auth_kea
+ #define S_ECDSA "ECDSA", ssl_auth_ecdsa
++#define S_GOST  "GOST", ssl_auth_gost
+ 
+ #define K_DHE	"DHE", kt_dh
+ #define K_RSA	"RSA", kt_rsa
+ #define K_KEA	"KEA", kt_kea
+ #define K_ECDH	"ECDH", kt_ecdh
+ #define K_ECDHE	"ECDHE", kt_ecdh
++#define K_GOST	"GOST", kt_gost
+ 
+ #define C_SEED 	"SEED", calg_seed
+ #define C_CAMELLIA	"CAMELLIA", calg_camellia
+ #define C_AES	"AES", calg_aes
+ #define C_RC4	"RC4", calg_rc4
+ #define C_RC2	"RC2", calg_rc2
+ #define C_DES	"DES", calg_des
+ #define C_3DES	"3DES", calg_3des
+ #define C_NULL  "NULL", calg_null
+ #define C_SJ 	"SKIPJACK", calg_sj
++#define C_GOST 	"GOST", calg_gost
+ 
+ #define B_256	256, 256, 256
+ #define B_128	128, 128, 128
+ #define B_3DES  192, 156, 112
+ #define B_SJ     96,  80,  80
+ #define B_DES    64,  56,  56
+ #define B_56    128,  56,  56
+ #define B_40    128,  40,  40
+ #define B_0  	  0,   0,   0
+ 
+ #define M_SHA	"SHA1", ssl_mac_sha, 160
+ #define M_MD5	"MD5",  ssl_mac_md5, 128
++#define M_GOST	"GOST",  ssl_mac_gost, 256
+ 
+ static const SSLCipherSuiteInfo suiteInfo[] = {
+ /* <------ Cipher suite --------------------> <auth> <KEA>  <bulk cipher> <MAC> <FIPS> */
+ {0,CS(TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA), S_RSA, K_DHE, C_CAMELLIA, B_256, M_SHA, 0, 0, 0, },
+ {0,CS(TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA), S_DSA, K_DHE, C_CAMELLIA, B_256, M_SHA, 0, 0, 0, },
+ {0,CS(TLS_DHE_RSA_WITH_AES_256_CBC_SHA),      S_RSA, K_DHE, C_AES, B_256, M_SHA, 1, 0, 0, },
+ {0,CS(TLS_DHE_DSS_WITH_AES_256_CBC_SHA),      S_DSA, K_DHE, C_AES, B_256, M_SHA, 1, 0, 0, },
+ {0,CS(TLS_RSA_WITH_CAMELLIA_256_CBC_SHA),     S_RSA, K_RSA, C_CAMELLIA, B_256, M_SHA, 0, 0, 0, },
+ {0,CS(TLS_RSA_WITH_AES_256_CBC_SHA),          S_RSA, K_RSA, C_AES, B_256, M_SHA, 1, 0, 0, },
+ 
++{0,CS(TLS_GOSTR341001_WITH_28147_CNT_IMIT),   S_GOST,K_GOST,C_GOST,B_256, M_GOST,0, 0, 0, },
++
+ {0,CS(TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA), S_RSA, K_DHE, C_CAMELLIA, B_128, M_SHA, 0, 0, 0, },
+ {0,CS(TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA), S_DSA, K_DHE, C_CAMELLIA, B_128, M_SHA, 0, 0, 0, },
+ {0,CS(TLS_DHE_DSS_WITH_RC4_128_SHA),          S_DSA, K_DHE, C_RC4, B_128, M_SHA, 0, 0, 0, },
+ {0,CS(TLS_DHE_RSA_WITH_AES_128_CBC_SHA),      S_RSA, K_DHE, C_AES, B_128, M_SHA, 1, 0, 0, },
+ {0,CS(TLS_DHE_DSS_WITH_AES_128_CBC_SHA),      S_DSA, K_DHE, C_AES, B_128, M_SHA, 1, 0, 0, },
+ {0,CS(TLS_RSA_WITH_SEED_CBC_SHA),             S_RSA, K_RSA, C_SEED,B_128, M_SHA, 1, 0, 0, },
+ {0,CS(TLS_RSA_WITH_CAMELLIA_128_CBC_SHA),     S_RSA, K_RSA, C_CAMELLIA, B_128, M_SHA, 0, 0, 0, },
+ {0,CS(SSL_RSA_WITH_RC4_128_MD5),              S_RSA, K_RSA, C_RC4, B_128, M_MD5, 0, 0, 0, },
+diff --git a/security/nss/lib/ssl/sslproto.h b/security/nss/lib/ssl/sslproto.h
+--- a/security/nss/lib/ssl/sslproto.h
++++ b/security/nss/lib/ssl/sslproto.h
+@@ -167,16 +167,18 @@
+ 
+ #define TLS_RSA_EXPORT1024_WITH_DES_CBC_SHA     0x0062
+ #define TLS_RSA_EXPORT1024_WITH_RC4_56_SHA      0x0064
+ 
+ #define TLS_DHE_DSS_EXPORT1024_WITH_DES_CBC_SHA 0x0063
+ #define TLS_DHE_DSS_EXPORT1024_WITH_RC4_56_SHA  0x0065
+ #define TLS_DHE_DSS_WITH_RC4_128_SHA            0x0066
+ 
++#define TLS_GOSTR341001_WITH_28147_CNT_IMIT		0x0081
++
+ #define TLS_RSA_WITH_CAMELLIA_256_CBC_SHA      	0x0084
+ #define TLS_DH_DSS_WITH_CAMELLIA_256_CBC_SHA   	0x0085
+ #define TLS_DH_RSA_WITH_CAMELLIA_256_CBC_SHA   	0x0086
+ #define TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA  	0x0087
+ #define TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA  	0x0088
+ #define TLS_DH_ANON_WITH_CAMELLIA_256_CBC_SHA  	0x0089
+ 
+ #define TLS_RSA_WITH_SEED_CBC_SHA		0x0096
+diff --git a/security/nss/lib/ssl/sslsecur.c b/security/nss/lib/ssl/sslsecur.c
+--- a/security/nss/lib/ssl/sslsecur.c
++++ b/security/nss/lib/ssl/sslsecur.c
+@@ -631,16 +631,19 @@ ssl_FindCertKEAType(CERTCertificate * ce
+   case SEC_OID_X942_DIFFIE_HELMAN_KEY:
+     keaType = kt_dh;
+     break;
+ #ifdef NSS_ENABLE_ECC
+   case SEC_OID_ANSIX962_EC_PUBLIC_KEY:
+     keaType = kt_ecdh;
+     break;
+ #endif /* NSS_ENABLE_ECC */
++  case SEC_OID_GOSTR3410:
++    keaType = kt_gost;
++    break;
+   default:
+     keaType = kt_null;
+   }
+   
+  loser:
+   
+   return keaType;
+ 
+diff --git a/security/nss/lib/ssl/sslsock.c b/security/nss/lib/ssl/sslsock.c
+--- a/security/nss/lib/ssl/sslsock.c
++++ b/security/nss/lib/ssl/sslsock.c
+@@ -121,16 +121,17 @@ static cipherPolicy ssl_ciphers[] = {	  
+  {  TLS_ECDH_RSA_WITH_AES_128_CBC_SHA,      SSL_NOT_ALLOWED, SSL_NOT_ALLOWED },
+  {  TLS_ECDH_RSA_WITH_AES_256_CBC_SHA,      SSL_NOT_ALLOWED, SSL_NOT_ALLOWED },
+  {  TLS_ECDHE_RSA_WITH_NULL_SHA,            SSL_ALLOWED,     SSL_ALLOWED },
+  {  TLS_ECDHE_RSA_WITH_RC4_128_SHA,         SSL_NOT_ALLOWED, SSL_NOT_ALLOWED },
+  {  TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,    SSL_NOT_ALLOWED, SSL_NOT_ALLOWED },
+  {  TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,     SSL_NOT_ALLOWED, SSL_NOT_ALLOWED },
+  {  TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,     SSL_NOT_ALLOWED, SSL_NOT_ALLOWED },
+ #endif /* NSS_ENABLE_ECC */
++ {  TLS_GOSTR341001_WITH_28147_CNT_IMIT,    SSL_NOT_ALLOWED, SSL_NOT_ALLOWED },
+  {  0,					    SSL_NOT_ALLOWED, SSL_NOT_ALLOWED }
+ };
+ 
+ static const sslSocketOps ssl_default_ops = {	/* No SSL. */
+     ssl_DefConnect,
+     NULL,
+     ssl_DefBind,
+     ssl_DefListen,
+diff --git a/security/nss/lib/ssl/sslt.h b/security/nss/lib/ssl/sslt.h
+--- a/security/nss/lib/ssl/sslt.h
++++ b/security/nss/lib/ssl/sslt.h
+@@ -69,65 +69,71 @@ typedef struct SSL3StatisticsStr {
+ 
+ /* Key Exchange algorithm values */
+ typedef enum {
+     ssl_kea_null     = 0,
+     ssl_kea_rsa      = 1,
+     ssl_kea_dh       = 2,
+     ssl_kea_fortezza = 3,       /* deprecated, now unused */
+     ssl_kea_ecdh     = 4,
++    ssl_kea_gost     = 5,
+     ssl_kea_size		/* number of ssl_kea_ algorithms */
+ } SSLKEAType;
+ 
+ /* The following defines are for backwards compatibility.
+ ** They will be removed in a forthcoming release to reduce namespace pollution.
+ ** programs that use the kt_ symbols should convert to the ssl_kt_ symbols
+ ** soon.
+ */
+ #define kt_null   	ssl_kea_null
+ #define kt_rsa   	ssl_kea_rsa
+ #define kt_dh   	ssl_kea_dh
+ #define kt_fortezza	ssl_kea_fortezza       /* deprecated, now unused */
+ #define kt_ecdh   	ssl_kea_ecdh
++#define kt_gost   	ssl_kea_gost
+ #define kt_kea_size	ssl_kea_size
+ 
+ typedef enum {
+     ssl_sign_null   = 0, 
+     ssl_sign_rsa    = 1,
+     ssl_sign_dsa    = 2,
+-    ssl_sign_ecdsa  = 3
++    ssl_sign_ecdsa  = 3,
++    ssl_sign_gost   = 4
+ } SSLSignType;
+ 
+ typedef enum {
+     ssl_auth_null   = 0, 
+     ssl_auth_rsa    = 1,
+     ssl_auth_dsa    = 2,
+     ssl_auth_kea    = 3,
+-    ssl_auth_ecdsa  = 4
++    ssl_auth_ecdsa  = 4,
++    ssl_auth_gost   = 5
+ } SSLAuthType;
+ 
+ typedef enum {
+     ssl_calg_null     = 0,
+     ssl_calg_rc4      = 1,
+     ssl_calg_rc2      = 2,
+     ssl_calg_des      = 3,
+     ssl_calg_3des     = 4,
+     ssl_calg_idea     = 5,
+     ssl_calg_fortezza = 6,      /* deprecated, now unused */
+     ssl_calg_aes      = 7,      /* coming soon */
+     ssl_calg_camellia = 8,
+-    ssl_calg_seed     = 9
++    ssl_calg_seed     = 9,
++    ssl_calg_gost     = 10
+ } SSLCipherAlgorithm;
+ 
+ typedef enum { 
+     ssl_mac_null      = 0, 
+     ssl_mac_md5       = 1, 
+     ssl_mac_sha       = 2, 
+     ssl_hmac_md5      = 3, 	/* TLS HMAC version of mac_md5 */
+-    ssl_hmac_sha      = 4 	/* TLS HMAC version of mac_sha */
++    ssl_hmac_sha      = 4, 	/* TLS HMAC version of mac_sha */
++    ssl_mac_gost      = 5
+ } SSLMACAlgorithm;
+ 
+ typedef enum {
+     ssl_compression_null = 0,
+     ssl_compression_deflate = 1  /* RFC 3749 */
+ } SSLCompressionMethod;
+ 
+ typedef struct SSLChannelInfoStr {
+diff --git a/security/nss/lib/util/ciferfam.h b/security/nss/lib/util/ciferfam.h
+--- a/security/nss/lib/util/ciferfam.h
++++ b/security/nss/lib/util/ciferfam.h
+@@ -71,22 +71,24 @@
+ #define	SMIME_RC2_CBC_128		(CIPHER_FAMILYID_SMIME | 0003)
+ #define	SMIME_DES_CBC_56		(CIPHER_FAMILYID_SMIME | 0011)
+ #define	SMIME_DES_EDE3_168		(CIPHER_FAMILYID_SMIME | 0012)
+ #define	SMIME_AES_CBC_128		(CIPHER_FAMILYID_SMIME | 0013)
+ #define	SMIME_RC5PAD_64_16_40		(CIPHER_FAMILYID_SMIME | 0021)
+ #define	SMIME_RC5PAD_64_16_64		(CIPHER_FAMILYID_SMIME | 0022)
+ #define	SMIME_RC5PAD_64_16_128		(CIPHER_FAMILYID_SMIME | 0023)
+ #define	SMIME_FORTEZZA			(CIPHER_FAMILYID_SMIME | 0031)
++#define	SMIME_GOST			(CIPHER_FAMILYID_SMIME | 0032)
+ 
+ /* PKCS12 "Cipher Suites" */
+ 
+ #define	PKCS12_RC2_CBC_40		(CIPHER_FAMILYID_PKCS12 | 0001)
+ #define	PKCS12_RC2_CBC_128		(CIPHER_FAMILYID_PKCS12 | 0002)
+ #define	PKCS12_RC4_40			(CIPHER_FAMILYID_PKCS12 | 0011)
+ #define	PKCS12_RC4_128			(CIPHER_FAMILYID_PKCS12 | 0012)
+ #define	PKCS12_DES_56			(CIPHER_FAMILYID_PKCS12 | 0021)
+ #define	PKCS12_DES_EDE3_168		(CIPHER_FAMILYID_PKCS12 | 0022)
++#define	PKCS12_GOST			(CIPHER_FAMILYID_PKCS12 | 0031)
+ 
+ /* SMIME version numbers are negative, to avoid colliding with SSL versions */
+ #define SMIME_LIBRARY_VERSION_1_0			-0x0100
+ 
+ #endif /* _CIFERFAM_H_ */
+diff --git a/security/nss/lib/util/pkcs11t.h b/security/nss/lib/util/pkcs11t.h
+--- a/security/nss/lib/util/pkcs11t.h
++++ b/security/nss/lib/util/pkcs11t.h
+@@ -1772,14 +1772,53 @@ typedef CK_PKCS5_PBKD2_PARAMS CK_PTR CK_
+ #define CKF_EC_FP             CKF_EC_F_P
+ /* new in v2.11 deprecated by 2.20 */
+ #define CKR_KEY_PARAMS_INVALID                0x0000006B
+ 
+ /* stuff that for historic reasons is in this header file but should have
+  * been in pkcs11n.h */
+ #define CKK_INVALID_KEY_TYPE  0xffffffff
+ 
++typedef struct CK_GOSTR3410_KEY_WRAP_PARAMS {
++	CK_BYTE_PTR      pWrapOID;
++	CK_ULONG         ulWrapOIDLen;
++	CK_BYTE_PTR      pUKM;
++	CK_ULONG         ulUKMLen;
++	CK_OBJECT_HANDLE hKey;
++} CK_GOSTR3410_KEY_WRAP_PARAMS;
++
++typedef struct CK_GOSTR3410_DERIVE_PARAMS {
++	CK_EC_KDF_TYPE kdf;
++	CK_BYTE_PTR    pPublicData;
++	CK_ULONG       ulPublicDataLen;
++	CK_BYTE_PTR    pUKM;
++	CK_ULONG       ulUKMLen;
++} CK_GOSTR3410_DERIVE_PARAMS;
++
++#define CKK_GOSTR3410 0x00000030
++#define CKK_GOSTR3411 0x00000031
++#define CKK_GOST28147 0x00000032
++
++#define CKM_GOSTR3410_KEY_PAIR_GEN   0x00001200
++#define CKM_GOSTR3410                0x00001201
++#define CKM_GOSTR3410_WITH_GOSTR3411 0x00001202
++#define CKM_GOSTR3410_KEY_WRAP       0x00001203
++#define CKM_GOSTR3410_DERIVE         0x00001204
++#define CKM_GOSTR3411                0x00001210
++#define CKM_GOSTR3411_HMAC           0x00001211
++#define CKM_GOST28147_KEY_GEN        0x00001220
++#define CKM_GOST28147_ECB            0x00001221
++#define CKM_GOST28147                0x00001222
++#define CKM_GOST28147_MAC            0x00001223
++#define CKM_GOST28147_KEY_WRAP       0x00001224
++
++#define CKA_GOSTR3410PARAMS         0x00000250
++#define CKA_GOSTR3411PARAMS         0x00000251
++#define CKA_GOST28147PARAMS         0x00000252
++
++#define CKP_PKCS5_PBKD2_HMAC_GOSTR3411 0x00000002
++
+ #include "pkcs11n.h"
+ 
+ /* undo packing */
+ #include "pkcs11u.h"
+ 
+ #endif
+diff --git a/security/nss/lib/util/secdig.c b/security/nss/lib/util/secdig.c
+--- a/security/nss/lib/util/secdig.c
++++ b/security/nss/lib/util/secdig.c
+@@ -62,26 +62,27 @@ SGN_EncodeDigestInfo(PRArenaPool *poolp,
+ }
+ 
+ SGNDigestInfo *
+ SGN_CreateDigestInfo(SECOidTag algorithm, unsigned char *sig, unsigned len)
+ {
+     SGNDigestInfo *di;
+     SECStatus rv;
+     PRArenaPool *arena;
+-    SECItem *null_param;
++    SECItem *null_param = NULL;
+     SECItem dummy_value;
+ 
+     switch (algorithm) {
+       case SEC_OID_MD2:
+       case SEC_OID_MD5:
+       case SEC_OID_SHA1:
+       case SEC_OID_SHA256:
+       case SEC_OID_SHA384:
+       case SEC_OID_SHA512:
++      case SEC_OID_GOSTR3411:
+ 	break;
+       default:
+ 	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+ 	return NULL;
+     }
+ 
+     arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
+     if (arena == NULL) {
+@@ -91,26 +92,28 @@ SGN_CreateDigestInfo(SECOidTag algorithm
+     di = (SGNDigestInfo *) PORT_ArenaZAlloc(arena, sizeof(SGNDigestInfo));
+     if (di == NULL) {
+ 	PORT_FreeArena(arena, PR_FALSE);
+ 	return NULL;
+     }
+ 
+     di->arena = arena;
+ 
++    if (algorithm != SEC_OID_GOSTR3411) {
+     /*
+      * PKCS #1 specifies that the AlgorithmID must have a NULL parameter
+      * (as opposed to no parameter at all).
+      */
+     dummy_value.data = NULL;
+     dummy_value.len = 0;
+     null_param = SEC_ASN1EncodeItem(NULL, NULL, &dummy_value, SEC_NullTemplate);
+     if (null_param == NULL) {
+ 	goto loser;
+     }
++    }
+ 
+     rv = SECOID_SetAlgorithmID(arena, &di->digestAlgorithm, algorithm,
+ 			       null_param);
+ 
+     SECITEM_FreeItem(null_param, PR_TRUE);
+ 
+     if (rv != SECSuccess) {
+ 	goto loser;
+diff --git a/security/nss/lib/util/secoid.c b/security/nss/lib/util/secoid.c
+--- a/security/nss/lib/util/secoid.c
++++ b/security/nss/lib/util/secoid.c
+@@ -597,16 +597,24 @@ CONST_OID secgECsect283k1[] = {SECG_OID,
+ CONST_OID secgECsect283r1[] = {SECG_OID, 0x11 };
+ CONST_OID secgECsect409k1[] = {SECG_OID, 0x24 };
+ CONST_OID secgECsect409r1[] = {SECG_OID, 0x25 };
+ CONST_OID secgECsect571k1[] = {SECG_OID, 0x26 };
+ CONST_OID secgECsect571r1[] = {SECG_OID, 0x27 };
+ 
+ CONST_OID seed_CBC[]				= { SEED_OID, 4 };
+ 
++#define RU_CRYPTOPRO  0x2a, 0x85, 0x03, 0x02, 0x02
++CONST_OID oidGOSTR3410[]          = { RU_CRYPTOPRO, 19 };
++CONST_OID oidGOSTR3411[]          = { RU_CRYPTOPRO, 9 };
++CONST_OID oidGOSTR3411_HMAC[]     = { RU_CRYPTOPRO, 10 };
++CONST_OID oidGOSTR3410Signature[] = { RU_CRYPTOPRO, 3 };
++CONST_OID oidGOST28147[]          = { RU_CRYPTOPRO, 21 };
++
++
+ #define OI(x) { siDEROID, (unsigned char *)x, sizeof x }
+ #ifndef SECOID_NO_STRINGS
+ #define OD(oid,tag,desc,mech,ext) { OI(oid), tag, desc, mech, ext }
+ #else
+ #define OD(oid,tag,desc,mech,ext) { OI(oid), tag, 0, mech, ext }
+ #endif
+ 
+ #if defined(NSS_ALLOW_UNSUPPORTED_CRITICAL)
+@@ -1631,16 +1639,28 @@ const static SECOidData oids[SEC_OID_TOT
+ 
+     OD( pkcs1RSAPSSSignature, SEC_OID_PKCS1_RSA_PSS_SIGNATURE,
+ 	"PKCS #1 RSA-PSS Signature", CKM_RSA_PKCS_PSS,
+ 	INVALID_CERT_EXTENSION ),
+ 
+     OD( pkcs1SHA224WithRSAEncryption, SEC_OID_PKCS1_SHA224_WITH_RSA_ENCRYPTION,
+ 	"PKCS #1 SHA-224 With RSA Encryption", CKM_SHA224_RSA_PKCS,
+ 	INVALID_CERT_EXTENSION ),
++
++    OD( oidGOSTR3410, SEC_OID_GOSTR3410,
++	"GOST R34.10-2001", CKM_GOSTR3410, INVALID_CERT_EXTENSION ),
++    OD( oidGOSTR3410Signature, SEC_OID_GOSTR3410_SIGNATURE,
++	"GOST R34.10-2001 with GOST R34.11-94",
++	CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION ),
++    OD( oidGOSTR3411, SEC_OID_GOSTR3411,
++	"GOST R34.11-94", CKM_GOSTR3411, INVALID_CERT_EXTENSION ),
++    OD( oidGOSTR3411_HMAC, SEC_OID_GOSTR3411_HMAC,
++	"GOST R34.11-94 HMAC", CKM_GOSTR3411_HMAC, INVALID_CERT_EXTENSION ),
++    OD( oidGOST28147, SEC_OID_GOST28147,
++	"GOST 28147-89", CKM_GOST28147, INVALID_CERT_EXTENSION ),
+ };
+ 
+ /* PRIVATE EXTENDED SECOID Table
+  * This table is private. Its structure is opaque to the outside.
+  * It is indexed by the same SECOidTag as the oids table above.
+  * Every member of this struct must have accessor functions (set, get)
+  * and those functions must operate by value, not by reference.
+  * The addresses of the contents of this table must not be exposed 
+diff --git a/security/nss/lib/util/secoidt.h b/security/nss/lib/util/secoidt.h
+--- a/security/nss/lib/util/secoidt.h
++++ b/security/nss/lib/util/secoidt.h
+@@ -451,16 +451,22 @@ typedef enum {
+     SEC_OID_X509_ANY_POLICY                 = 303,
+ 
+     SEC_OID_PKCS1_RSA_OAEP_ENCRYPTION       = 304,
+     SEC_OID_PKCS1_MGF1                      = 305,
+     SEC_OID_PKCS1_PSPECIFIED                = 306,
+     SEC_OID_PKCS1_RSA_PSS_SIGNATURE         = 307,
+     SEC_OID_PKCS1_SHA224_WITH_RSA_ENCRYPTION = 308,
+ 
++    SEC_OID_GOSTR3410           = 309,
++    SEC_OID_GOSTR3410_SIGNATURE = 310,
++    SEC_OID_GOSTR3411           = 311,
++    SEC_OID_GOSTR3411_HMAC      = 312,
++    SEC_OID_GOST28147           = 313,
++
+     SEC_OID_TOTAL
+ } SECOidTag;
+ 
+ #define SEC_OID_SECG_EC_SECP192R1 SEC_OID_ANSIX962_EC_PRIME192V1
+ #define SEC_OID_SECG_EC_SECP256R1 SEC_OID_ANSIX962_EC_PRIME256V1
+ #define SEC_OID_PKCS12_KEY_USAGE  SEC_OID_X509_KEY_USAGE
+ 
+ /* fake OID for DSS sign/verify */
