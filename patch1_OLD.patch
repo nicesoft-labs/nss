@@ -1,0 +1,3425 @@
+Index: security/nss/cmd/p7sign/p7sign.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/cmd/p7sign/p7sign.c,v
+retrieving revision 1.14
+diff -u -p -r1.14 p7sign.c
+--- security/nss/cmd/p7sign/p7sign.c	4 Aug 2008 22:58:28 -0000	1.14
++++ security/nss/cmd/p7sign/p7sign.c	24 Sep 2009 15:16:38 -0000
+@@ -105,7 +105,7 @@ CreateDigest(SECItem *data, char *digest
+     /* XXX probably want to extend interface to allow other hash algorithms */
+     hashObj = HASH_GetHashObject(HASH_AlgSHA1);
+ 
+-    hashcx = (* hashObj->create)();
++    hashcx = (* hashObj->create)(NULL);
+     if (hashcx == NULL)
+ 	return -1;
+ 
+Index: security/nss/cmd/p7verify/p7verify.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/cmd/p7verify/p7verify.c,v
+retrieving revision 1.10
+diff -u -p -r1.10 p7verify.c
+--- security/nss/cmd/p7verify/p7verify.c	8 Aug 2008 23:47:57 -0000	1.10
++++ security/nss/cmd/p7verify/p7verify.c	24 Sep 2009 15:16:38 -0000
+@@ -95,7 +95,7 @@ DigestFile(unsigned char *digest, unsign
+ 
+     hashObj = HASH_GetHashObject(hashType);
+ 
+-    hashcx = (* hashObj->create)();
++    hashcx = (* hashObj->create)(NULL);
+     if (hashcx == NULL)
+ 	return -1;
+ 
+Index: security/nss/cmd/signtool/sign.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/cmd/signtool/sign.c,v
+retrieving revision 1.15
+diff -u -p -r1.15 sign.c
+--- security/nss/cmd/signtool/sign.c	8 Aug 2008 23:48:05 -0000	1.15
++++ security/nss/cmd/signtool/sign.c	24 Sep 2009 15:16:38 -0000
+@@ -636,7 +636,7 @@ SignFile (FILE *outFile, FILE *inFile, C
+     /* XXX probably want to extend interface to allow other hash algorithms */
+     hashObj = HASH_GetHashObject(HASH_AlgSHA1);
+ 
+-    hashcx = (*hashObj->create)();
++    hashcx = (*hashObj->create)(NULL);
+     if (hashcx == NULL)
+ 	return - 1;
+ 
+Index: security/nss/lib/certdb/certdb.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/certdb/certdb.c,v
+retrieving revision 1.101
+diff -u -p -r1.101 certdb.c
+--- security/nss/lib/certdb/certdb.c	18 May 2009 21:33:25 -0000	1.101
++++ security/nss/lib/certdb/certdb.c	24 Sep 2009 15:16:38 -0000
+@@ -1348,6 +1348,7 @@ CERT_CheckKeyUsage(CERTCertificate *cert
+ 	    requiredUsage |= KU_KEY_AGREEMENT;
+ 	    break;
+ 	case ecKey:
++	case gostKey:
+ 	    /* Accept either signature or agreement. */
+ 	    if (!(cert->keyUsage & (KU_DIGITAL_SIGNATURE | KU_KEY_AGREEMENT)))
+ 		 goto loser;
+@@ -1553,14 +1554,14 @@ cert_VerifySubjectAltName(CERTCertificat
+ 		*/
+ 		int cnLen = current->name.other.len;
+ 		rv = CERT_RFC1485_EscapeAndQuote(cn, cnBufLen, 
+-					    current->name.other.data, cnLen);
++					    (char *)(current->name.other.data), cnLen);
+ 		if (rv != SECSuccess && PORT_GetError() == SEC_ERROR_OUTPUT_LEN) {
+ 		    cnBufLen = cnLen * 3 + 3; /* big enough for worst case */
+ 		    cn = (char *)PORT_ArenaAlloc(arena, cnBufLen);
+ 		    if (!cn)
+ 			goto fail;
+ 		    rv = CERT_RFC1485_EscapeAndQuote(cn, cnBufLen, 
+-					    current->name.other.data, cnLen);
++					    (char *)(current->name.other.data), cnLen);
+ 		}
+ 		if (rv == SECSuccess)
+ 		    rv = cert_TestHostName(cn ,hn);
+Index: security/nss/lib/cryptohi/keyi.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/cryptohi/keyi.h,v
+retrieving revision 1.1
+diff -u -p -r1.1 keyi.h
+--- security/nss/lib/cryptohi/keyi.h	8 Feb 2006 06:14:07 -0000	1.1
++++ security/nss/lib/cryptohi/keyi.h	24 Sep 2009 15:16:39 -0000
+@@ -52,6 +52,8 @@ KeyType seckey_GetKeyType(SECOidTag pubK
+ SECStatus sec_DecodeSigAlg(const SECKEYPublicKey *key, SECOidTag sigAlg,
+              const SECItem *param, SECOidTag *encalg, SECOidTag *hashalg);
+ 
++PRBool sec_IsEmptyOrDerNull( const SECItem * );
++
+ SEC_END_PROTOS
+ 
+ #endif /* _KEYHI_H_ */
+Index: security/nss/lib/cryptohi/keythi.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/cryptohi/keythi.h,v
+retrieving revision 1.11
+diff -u -p -r1.11 keythi.h
+--- security/nss/lib/cryptohi/keythi.h	19 Nov 2008 16:20:12 -0000	1.11
++++ security/nss/lib/cryptohi/keythi.h	24 Sep 2009 15:16:39 -0000
+@@ -49,7 +49,8 @@ typedef enum { 
+     fortezzaKey = 3,
+     dhKey = 4, 
+     keaKey = 5,
+-    ecKey = 6
++    ecKey = 6,   /* ECC, X9.62 ECDSA algorithms */
++    gostKey = 7  /* ECC, GOST  ECDSA algorithms (RFC4491,RFC4357) */
+ } KeyType;
+ 
+ /*
+@@ -124,6 +125,7 @@ typedef struct SECKEYDHPublicKeyStr SECK
+ 
+ /*
+ ** Elliptic curve Public Key structure
++    for ANSI X9.62 EC DSA
+ ** The PKCS#11 layer needs DER encoding of ANSI X9.62
+ ** parameters value
+ */
+@@ -143,6 +145,18 @@ struct SECKEYECPublicKeyStr {
+ typedef struct SECKEYECPublicKeyStr SECKEYECPublicKey;
+ 
+ /*
++** Elliptic curve Public Key structure
++    for GOST R 34.10-2001 (Russian Federation). See RFC4491, sect. 2.3.2
++*/
++struct SECKEYGOSTPublicKeyStr {
++    SECItem value;     /* Q (pub. EC point): (x,y): 2x32 bytes, little-endian */
++    SECItem params;        /* EC params OID.              RFC4357, sect.8.4 */
++    SECItem digestParams;  /* GOST R 34.11-94 params OID. RFC4357, sect.8.2 */
++    SECItem encryptParams; /* GOST 28147-89 params OID.   RFC4357, sect.8.1 */
++};
++typedef struct SECKEYGOSTPublicKeyStr SECKEYGOSTPublicKey;
++
++/*
+ ** FORTEZZA Public Key structures
+ */
+ struct SECKEYFortezzaPublicKeyStr {
+@@ -198,6 +212,7 @@ struct SECKEYPublicKeyStr {
+         SECKEYKEAPublicKey kea;
+         SECKEYFortezzaPublicKey fortezza;
+ 	SECKEYECPublicKey  ec;
++	SECKEYGOSTPublicKey  gost;
+     } u;
+ };
+ typedef struct SECKEYPublicKeyStr SECKEYPublicKey;
+Index: security/nss/lib/cryptohi/sechash.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/cryptohi/sechash.c,v
+retrieving revision 1.9
+diff -u -p -r1.9 sechash.c
+--- security/nss/lib/cryptohi/sechash.c	22 Feb 2008 21:14:20 -0000	1.9
++++ security/nss/lib/cryptohi/sechash.c	24 Sep 2009 15:16:39 -0000
+@@ -40,7 +40,7 @@
+ #include "pk11func.h"	/* for the PK11_ calls below. */
+ 
+ static void *
+-null_hash_new_context(void)
++null_hash_new_context(const SECItem *param)
+ {
+     return NULL;
+ }
+@@ -75,40 +75,50 @@ null_hash_destroy_context(void *v, PRBoo
+     PORT_Assert(v == NULL);
+ }
+ 
++/* MD*, SHA* digests do not take parameters, but GOST R 34.11-94 does.
++    This knowledge is not a business of the SECHashObjects dispatch table,
++    hence, I just uniformly pass all parameters to the lower layer.
++   Each particular algorithm below will discard not needed parameters.
++ */
+ 
+ static void *
+-md2_NewContext(void) {
+-	return (void *) PK11_CreateDigestContext(SEC_OID_MD2);
++md2_NewContext(const SECItem *param) {
++    return (void *) PK11_CreateDigestContextParam(SEC_OID_MD2, param);
+ }
+ 
+ static void *
+-md5_NewContext(void) {
+-	return (void *) PK11_CreateDigestContext(SEC_OID_MD5);
++md5_NewContext(const SECItem *param) {
++    return (void *) PK11_CreateDigestContextParam(SEC_OID_MD5, param);
+ }
+ 
+ static void *
+-sha1_NewContext(void) {
+-	return (void *) PK11_CreateDigestContext(SEC_OID_SHA1);
++sha1_NewContext(const SECItem *param) {
++    return (void *) PK11_CreateDigestContextParam(SEC_OID_SHA1, param);
+ }
+ 
+ static void *
+-sha256_NewContext(void) {
+-	return (void *) PK11_CreateDigestContext(SEC_OID_SHA256);
++sha256_NewContext(const SECItem *param) {
++    return (void *) PK11_CreateDigestContextParam(SEC_OID_SHA256, param);
+ }
+ 
+ static void *
+-sha384_NewContext(void) {
+-	return (void *) PK11_CreateDigestContext(SEC_OID_SHA384);
++sha384_NewContext(const SECItem *param) {
++    return (void *) PK11_CreateDigestContextParam(SEC_OID_SHA384, param);
+ }
+ 
+ static void *
+-sha512_NewContext(void) {
+-	return (void *) PK11_CreateDigestContext(SEC_OID_SHA512);
++sha512_NewContext(const SECItem *param) {
++    return (void *) PK11_CreateDigestContextParam(SEC_OID_SHA512, param);
++}
++
++static void *
++gostR3411_NewContext( const SECItem *param ) {
++    return (void *) PK11_CreateDigestContextParam( SEC_OID_CP_GOST_R3411, param );
+ }
+ 
+ const SECHashObject SECHashObjects[] = {
+   { 0,
+-    (void * (*)(void)) null_hash_new_context,
++    null_hash_new_context,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) null_hash_destroy_context,
+     (void (*)(void *)) null_hash_begin,
+@@ -119,7 +129,7 @@ const SECHashObject SECHashObjects[] = {
+     HASH_AlgNULL
+   },
+   { MD2_LENGTH,
+-    (void * (*)(void)) md2_NewContext,
++    md2_NewContext,
+     (void * (*)(void *)) PK11_CloneContext,
+     (void (*)(void *, PRBool)) PK11_DestroyContext,
+     (void (*)(void *)) PK11_DigestBegin,
+@@ -130,7 +140,7 @@ const SECHashObject SECHashObjects[] = {
+     HASH_AlgMD2
+   },
+   { MD5_LENGTH,
+-    (void * (*)(void)) md5_NewContext,
++    md5_NewContext,
+     (void * (*)(void *)) PK11_CloneContext,
+     (void (*)(void *, PRBool)) PK11_DestroyContext,
+     (void (*)(void *)) PK11_DigestBegin,
+@@ -141,7 +151,7 @@ const SECHashObject SECHashObjects[] = {
+     HASH_AlgMD5
+   },
+   { SHA1_LENGTH,
+-    (void * (*)(void)) sha1_NewContext,
++    sha1_NewContext,
+     (void * (*)(void *)) PK11_CloneContext,
+     (void (*)(void *, PRBool)) PK11_DestroyContext,
+     (void (*)(void *)) PK11_DigestBegin,
+@@ -152,7 +162,7 @@ const SECHashObject SECHashObjects[] = {
+     HASH_AlgSHA1
+   },
+   { SHA256_LENGTH,
+-    (void * (*)(void)) sha256_NewContext,
++    sha256_NewContext,
+     (void * (*)(void *)) PK11_CloneContext,
+     (void (*)(void *, PRBool)) PK11_DestroyContext,
+     (void (*)(void *)) PK11_DigestBegin,
+@@ -163,7 +173,7 @@ const SECHashObject SECHashObjects[] = {
+     HASH_AlgSHA256
+   },
+   { SHA384_LENGTH,
+-    (void * (*)(void)) sha384_NewContext,
++    sha384_NewContext,
+     (void * (*)(void *)) PK11_CloneContext,
+     (void (*)(void *, PRBool)) PK11_DestroyContext,
+     (void (*)(void *)) PK11_DigestBegin,
+@@ -174,7 +184,7 @@ const SECHashObject SECHashObjects[] = {
+     HASH_AlgSHA384
+   },
+   { SHA512_LENGTH,
+-    (void * (*)(void)) sha512_NewContext,
++    sha512_NewContext,
+     (void * (*)(void *)) PK11_CloneContext,
+     (void (*)(void *, PRBool)) PK11_DestroyContext,
+     (void (*)(void *)) PK11_DigestBegin,
+@@ -184,6 +194,17 @@ const SECHashObject SECHashObjects[] = {
+     SHA512_BLOCK_LENGTH,
+     HASH_AlgSHA512
+   },
++  { GOSTR3411_LENGTH,
++    gostR3411_NewContext,
++    (void * (*)(void *)) PK11_CloneContext,
++    (void (*)(void *, PRBool)) PK11_DestroyContext,
++    (void (*)(void *)) PK11_DigestBegin,
++    (void (*)(void *, const unsigned char *, unsigned int)) PK11_DigestOp,
++    (void (*)(void *, unsigned char *, unsigned int *, unsigned int))
++							PK11_DigestFinal,
++    GOSTR3411_BLOCK_LENGTH,
++    HASH_AlgGostR3411
++  }
+ };
+ 
+ const SECHashObject * 
+@@ -204,7 +225,9 @@ HASH_GetHashTypeByOidTag(SECOidTag hashO
+     case SEC_OID_SHA256: ht = HASH_AlgSHA256; break;
+     case SEC_OID_SHA384: ht = HASH_AlgSHA384; break;
+     case SEC_OID_SHA512: ht = HASH_AlgSHA512; break;
+-    default:             ht = HASH_AlgNULL;   
++    case SEC_OID_CP_GOST_R3411:
++                         ht = HASH_AlgGostR3411; break;
++    default:             ht = HASH_AlgNULL;
+ 	PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+ 	break;
+     }
+@@ -295,6 +318,16 @@ HASH_HashBuf(HASH_HashType type,
+ 	     unsigned char *src,
+ 	     PRUint32 src_len)
+ {
++    return HASH_HashBufParam( type, dest, src, src_len, NULL );
++}
++
++SECStatus
++HASH_HashBufParam(HASH_HashType type,
++	     unsigned char *dest,
++	     unsigned char *src,
++	     PRUint32 src_len,
++	     const SECItem *param)
++{
+     HASHContext *cx;
+     unsigned int part;
+     
+@@ -302,7 +335,7 @@ HASH_HashBuf(HASH_HashType type,
+ 	return(SECFailure);
+     }
+     
+-    cx = HASH_Create(type);
++    cx = HASH_CreateParam( type, param );
+     if ( cx == NULL ) {
+ 	return(SECFailure);
+     }
+@@ -315,7 +348,12 @@ HASH_HashBuf(HASH_HashType type,
+ }
+ 
+ HASHContext *
+-HASH_Create(HASH_HashType type)
++HASH_Create(HASH_HashType type) {
++    return HASH_CreateParam( type, NULL );
++}
++
++HASHContext *
++HASH_CreateParam(HASH_HashType type, const SECItem *param )
+ {
+     void *hash_context = NULL;
+     HASHContext *ret = NULL;
+@@ -324,7 +362,7 @@ HASH_Create(HASH_HashType type)
+ 	return(NULL);
+     }
+     
+-    hash_context = (* SECHashObjects[type].create)();
++    hash_context = (* SECHashObjects[type].create)(param);
+     if ( hash_context == NULL ) {
+ 	goto loser;
+     }
+Index: security/nss/lib/cryptohi/seckey.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/cryptohi/seckey.c,v
+retrieving revision 1.49
+diff -u -p -r1.49 seckey.c
+--- security/nss/lib/cryptohi/seckey.c	18 Jun 2009 17:33:53 -0000	1.49
++++ security/nss/lib/cryptohi/seckey.c	24 Sep 2009 15:16:39 -0000
+@@ -146,6 +146,19 @@ const SEC_ASN1Template SECKEY_KEAParamsT
+     { 0, }
+ };
+ 
++#define DER_TL2 2 /* der (tag,len) sequence of 2 bytes length  */
++
++/* I do not make this template public, because it reference mutative
++    structure SECKEYGOSTPublicKey/SECKEYPublicKey (should it be public?) */
++static const SEC_ASN1Template SECKEY_GostR3410ParamTemplate[] = {
++    { SEC_ASN1_SEQUENCE, 0, NULL, sizeof(SECKEYGOSTPublicKey) },
++    { SEC_ASN1_OBJECT_ID, offsetof(SECKEYGOSTPublicKey, params) },
++    { SEC_ASN1_OBJECT_ID, offsetof(SECKEYGOSTPublicKey, digestParams) },
++    { SEC_ASN1_OBJECT_ID | SEC_ASN1_OPTIONAL,
++              offsetof(SECKEYGOSTPublicKey, encryptParams) },
++    { 0 }
++};
++
+ SEC_ASN1_CHOOSER_IMPLEMENT(SECKEY_DSAPublicKeyTemplate)
+ SEC_ASN1_CHOOSER_IMPLEMENT(SECKEY_RSAPublicKeyTemplate)
+ SEC_ASN1_CHOOSER_IMPLEMENT(CERT_SubjectPublicKeyInfoTemplate)
+@@ -984,12 +997,25 @@ seckey_GetKeyType (SECOidTag tag) {
+       case SEC_OID_ANSIX962_EC_PUBLIC_KEY:
+ 	keyType = ecKey;
+ 	break;
++      case SEC_OID_CP_GOST_R3410EL:
++	keyType = gostKey;
++	break;
+       default:
+ 	keyType = nullKey;
+     }
+     return keyType;
+ }
+ 
++/*! Assuming SECItem content is from SEC_QuickDERDecodeItem-parsed structure,
++    let it contain it's DER tag-len prefix.
++*/
++static void
++restoreDerTagLenPrefix( SECItem *t ) {
++    if( ! t->len ) return;
++    t->len  += DER_TL2;
++    t->data -= DER_TL2;
++}
++
+ /* Function used to determine what kind of cert we are dealing with. */
+ KeyType 
+ CERT_GetCertKeyType (CERTSubjectPublicKeyInfo *spki) 
+@@ -1001,7 +1027,7 @@ static SECKEYPublicKey *
+ seckey_ExtractPublicKey(CERTSubjectPublicKeyInfo *spki)
+ {
+     SECKEYPublicKey *pubk;
+-    SECItem os, newOs, newParms;
++    SECItem newOs, newParms;
+     SECStatus rv;
+     PRArenaPool *arena;
+     SECOidTag tag;
+@@ -1020,16 +1046,12 @@ seckey_ExtractPublicKey(CERTSubjectPubli
+     pubk->pkcs11Slot = 0;
+     pubk->pkcs11ID = CK_INVALID_HANDLE;
+ 
+-
+-    /* Convert bit string length from bits to bytes */
+-    os = spki->subjectPublicKey;
+-    DER_ConvertBitString (&os);
+-
+     tag = SECOID_GetAlgorithmTag(&spki->algorithm);
+ 
+     /* copy the DER into the arena, since Quick DER returns data that points
+        into the DER input, which may get freed by the caller */
+-    rv = SECITEM_CopyItem(arena, &newOs, &os);
++    rv = SECITEM_CopyData( arena, &newOs, siBuffer, spki->subjectPublicKey.data,
++        BITLEN_TO_OCTETLEN( spki->subjectPublicKey.len ) );
+     if ( rv == SECSuccess )
+     switch ( tag ) {
+       case SEC_OID_X500_RSA_ENCRYPTION:
+@@ -1131,21 +1153,82 @@ seckey_ExtractPublicKey(CERTSubjectPubli
+ 	 */
+         rv = SECITEM_CopyItem(arena, &pubk->u.ec.DEREncodedParams, 
+ 	    &spki->algorithm.parameters);
+-        if ( rv != SECSuccess )
++        if ( rv != SECSuccess ) break;
++        pubk->u.ec.publicValue = newOs; /* newOs already in arena */
++	return pubk; /* TODO chk wrk */
++
++      case SEC_OID_CP_GOST_R3410EL:
++        pubk->keyType = gostKey;
++        /* Parsing public key value.
++            subjectPublicKey bit-string content :=
++                        { der-encoded octet-string of pub-key-value }
++            Look into DER for myself: bit-string maybe shorter than enclosed
++            octet-string (see RFC4491, sect. 2.3.2.)
++        */
++        if( /* too long bit-string */
++            (newOs.len > (DER_TL2 + GOST_R3410EL_PUBKEY_LEN)) ||
++            /* not a 64-octets-string */
++            (newOs.data[0] != SEC_ASN1_OCTET_STRING)    ||
++            (newOs.data[1] != GOST_R3410EL_PUBKEY_LEN)
++        ) {
++            PORT_SetError(SEC_ERROR_BAD_DER);
+             break;
+-        rv = SECITEM_CopyItem(arena, &pubk->u.ec.publicValue, &newOs);
++        }
++        /* bit-string is *not* shortened */
++        if( newOs.len == (DER_TL2 + GOST_R3410EL_PUBKEY_LEN)) {
++            pubk->u.gost.value.len  = GOST_R3410EL_PUBKEY_LEN;
++            pubk->u.gost.value.data = newOs.data + DER_TL2;
++        } else {
++        /* bit-string is shortened, need allocate more room for pub.key
++            and zero-pad the tail */
++            SECItem *t = &pubk->u.gost.value;
++            unsigned int hasOctets = newOs.len - DER_TL2;
++            if( NULL == SECITEM_AllocItem( arena, t, GOST_R3410EL_PUBKEY_LEN ))
++                break;
++            PORT_Memcpy( t->data, newOs.data + DER_TL2, hasOctets );
++            PORT_Memset( t->data + hasOctets, 0,
++                    GOST_R3410EL_PUBKEY_LEN - hasOctets);
++        } // short pub.key value bit-string
++
++        /* Parsing public key parameters */
++        {
++            const SECItem *t = &spki->algorithm.parameters;
++            SECKEYGOSTPublicKey *g = &pubk->u.gost;
++
++            /* lack of parameters is OK */
++            if( ! sec_IsEmptyOrDerNull( t ) ) {
++            /* sequence of (ecc,digest,encrypt) param OIDs otherwise */
++
++                rv = SECITEM_CopyItem(arena, &newParms, t );
++                if ( rv != SECSuccess ) break;
++                rv = SEC_QuickDERDecodeItem(arena, g,
++                        SECKEY_GostR3410ParamTemplate, &newParms );
++                if ( rv != SECSuccess ) break;
++
++                /* PKCS#11 requires DER-encoded OIDS, i.e. with tag-len prefix,
++                which is stripped from SEC_QuickDERDecodeItem output. Patching*/
++
++                restoreDerTagLenPrefix( &g->params );
++                restoreDerTagLenPrefix( &g->digestParams );
++                restoreDerTagLenPrefix( &g->encryptParams );
++            } // is sequence
++        } // pub.key param
+ 	if (rv == SECSuccess) return pubk;
+-	break;
+-
+       default:
+-	rv = SECFailure;
+-	break;
++	;
+     }
+ 
+     SECKEY_DestroyPublicKey (pubk);
+     return NULL;
+ }
+ 
++PRBool sec_IsEmptyOrDerNull( const SECItem *t ) {
++    return
++        /* no item or empty item */
++        ( t == NULL ) || ( t->len == 0 ) ||
++        /* item is der-NULL parameter: 2bytes: 0x05,0x00 */
++        ( (t->len == 2) && (t->data[0] == SEC_ASN1_NULL) && (t->data[1] == 0));
++}
+ 
+ /* required for JSS */
+ SECKEYPublicKey *
+@@ -1531,7 +1614,9 @@ SECKEY_SignatureLen(const SECKEYPublicKe
+ 	/* Get the base point order length in bits and adjust */
+ 	size =	SECKEY_ECParamsToBasePointOrderLen(
+ 		&pubk->u.ec.DEREncodedParams);
+-	return ((size + 7)/8) * 2;
++	return BITLEN_TO_OCTETLEN(size) * 2;
++    case gostKey:
++        return GOST_R3410EL_SIGNATURE_LEN;
+     default:
+ 	break;
+     }
+@@ -1700,6 +1785,20 @@ SECKEY_CopyPublicKey(const SECKEYPublicK
+           rv = SECITEM_CopyItem(arena,&copyk->u.ec.publicValue,
+                                 &pubk->u.ec.publicValue);
+           break;
++      case gostKey:
++      {
++          const SECKEYGOSTPublicKey *s = &pubk ->u.gost;
++          SECKEYGOSTPublicKey       *t = &copyk->u.gost;
++          rv = (
++            (SECSuccess == SECITEM_CopyItem( arena, &t->value,  &s->value  )) &&
++            (SECSuccess == SECITEM_CopyItem( arena, &t->params, &s->params )) &&
++            (SECSuccess == SECITEM_CopyItem( arena, &t->digestParams,
++                &s->digestParams )) &&
++            (SECSuccess == SECITEM_CopyItem( arena, &t->encryptParams,
++                &s->encryptParams ))
++          ) ? SECSuccess : SECFailure;
++      }
++          break;
+       case nullKey:
+           return copyk;
+       default:
+Index: security/nss/lib/cryptohi/secsign.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/cryptohi/secsign.c,v
+retrieving revision 1.21
+diff -u -p -r1.21 secsign.c
+--- security/nss/lib/cryptohi/secsign.c	23 Sep 2009 22:51:56 -0000	1.21
++++ security/nss/lib/cryptohi/secsign.c	24 Sep 2009 15:16:39 -0000
+@@ -131,7 +131,7 @@ SGN_Begin(SGNContext *cx)
+     if (!cx->hashobj)
+ 	return SECFailure;	/* error code is already set */
+ 
+-    cx->hashcx = (*cx->hashobj->create)();
++    cx->hashcx = (*cx->hashobj->create)( NULL );
+     if (cx->hashcx == NULL)
+ 	return SECFailure;
+ 
+Index: security/nss/lib/cryptohi/secvfy.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/cryptohi/secvfy.c,v
+retrieving revision 1.22
+diff -u -p -r1.22 secvfy.c
+--- security/nss/lib/cryptohi/secvfy.c	28 Feb 2008 04:27:36 -0000	1.22
++++ security/nss/lib/cryptohi/secvfy.c	24 Sep 2009 15:16:39 -0000
+@@ -137,8 +137,10 @@ struct VFYContextStr {
+ 	unsigned char rsadigest[HASH_LENGTH_MAX];
+ 	/* the full DSA signature... 40 bytes */
+ 	unsigned char dsasig[DSA_SIGNATURE_LEN];
+-	/* the full ECDSA signature */
++	/* the full X9.62 ECDSA signature */
+ 	unsigned char ecdsasig[2 * MAX_ECKEY_LEN];
++        /* GOST R 34.10-2001 ECDSA signature */
++        unsigned char gostsig[ GOST_R3410EL_SIGNATURE_LEN ];
+     } u;
+     unsigned int rsadigestlen;
+     void * wincx;
+@@ -308,6 +310,14 @@ sec_DecodeSigAlg(const SECKEYPublicKey *
+ 	    return SECFailure;
+ 	}
+ 	break;
++      case SEC_OID_CP_GOST_R3411_R3410EL:
++	/* must be w/o parameters or with one NULL parameter (see RFC4491) */
++	if( ! sec_IsEmptyOrDerNull( param ) ) {
++	    PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
++	    return SECFailure;
++	}
++        *hashalg = SEC_OID_CP_GOST_R3411;
++        break;
+       /* we don't implement MD4 hashes */
+       case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
+       default:
+@@ -347,6 +357,9 @@ sec_DecodeSigAlg(const SECKEYPublicKey *
+       case SEC_OID_ANSIX962_ECDSA_SIGNATURE_SPECIFIED_DIGEST:
+ 	*encalg = SEC_OID_ANSIX962_EC_PUBLIC_KEY;
+ 	break;
++      case SEC_OID_CP_GOST_R3411_R3410EL:
++        *encalg = SEC_OID_CP_GOST_R3410EL;
++        break;
+       /* we don't implement MD4 hashes */
+       case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
+       default:
+@@ -393,7 +406,10 @@ vfy_CreateContext(const SECKEYPublicKey 
+     cx->hasSignature = (sig != NULL);
+     cx->encAlg = encAlg;
+     cx->hashAlg = hashAlg;
+-    cx->key = SECKEY_CopyPublicKey(key);
++    if( NULL == (cx->key = SECKEY_CopyPublicKey(key))) {
++        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
++	goto loser;
++    }
+     rv = SECSuccess;
+     if (sig) {
+ 	switch (key->keyType) {
+@@ -415,12 +431,24 @@ vfy_CreateContext(const SECKEYPublicKey 
+ 	    }
+ 	    rv = decodeECorDSASignature(encAlg, sig, cx->u.buffer, sigLen);
+  	    break;
++	case gostKey:
++            sigLen = SECKEY_SignatureLen(key);
++	    if( sigLen == 0 )  /* error set by SECKEY_SignatureLen */
++                rv = SECFailure;
++            else if( sig->len != sigLen ) {
++		PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
++                rv = SECFailure;
++            } else {
++                /* copy signature into VFYContext */
++                PORT_Memcpy( cx->u.buffer, sig->data, sigLen );
++            }
++            break;
+ 	default:
+ 	    rv = SECFailure;
+ 	    PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+ 	    break;
+-	}
+-    }
++	} /* switch keyType */
++    } /* if(sig) */
+ 
+     if (rv) goto loser;
+ 
+@@ -439,7 +467,7 @@ vfy_CreateContext(const SECKEYPublicKey 
+     if (cx) {
+ 	VFY_DestroyContext(cx, PR_TRUE);
+     }
+-    return 0;
++    return NULL;
+ }
+ 
+ VFYContext *
+@@ -505,7 +533,13 @@ VFY_Begin(VFYContext *cx)
+     if (!cx->hashobj) 
+ 	return SECFailure;	/* error code is set */
+ 
+-    cx->hashcx = (*cx->hashobj->create)();
++    /*  "GOST R 34.10-2001" key may specify hash(digest) parameter.
++        Hash type at the moment is "GOST R 34.11-94".
++     */
++    cx->hashcx = (*cx->hashobj->create)( 
++        (cx->key->keyType == gostKey) ? &cx->key->u.gost.digestParams : NULL
++    );
++
+     if (cx->hashcx == NULL)
+ 	return SECFailure;
+ 
+@@ -565,6 +599,19 @@ VFY_EndWithSignature(VFYContext *cx, SEC
+ 		return SECFailure;
+ 	}
+ 	break;
++      case gostKey:
++	dsasig.data = cx->u.buffer;
++	dsasig.len = SECKEY_SignatureLen(cx->key);
++	if (dsasig.len == 0) {
++	    return SECFailure;
++	}
++	hash.data = final;
++	hash.len = part;
++	if (PK11_Verify( cx->key, &dsasig, &hash, cx->wincx ) != SECSuccess) {
++		PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
++		return SECFailure;
++	}
++        break;
+       case rsaKey:
+ 	if (sig) {
+ 	    SECOidTag hashid = SEC_OID_UNKNOWN;
+Index: security/nss/lib/freebl/alghmac.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/alghmac.c,v
+retrieving revision 1.7
+diff -u -p -r1.7 alghmac.c
+--- security/nss/lib/freebl/alghmac.c	18 Nov 2008 19:48:21 -0000	1.7
++++ security/nss/lib/freebl/alghmac.c	24 Sep 2009 15:16:39 -0000
+@@ -87,7 +87,7 @@ HMAC_Init( HMACContext * cx, const SECHa
+     }
+     cx->wasAllocated = PR_FALSE;
+     cx->hashobj = hash_obj;
+-    cx->hash = cx->hashobj->create();
++    cx->hash = cx->hashobj->create( NULL );
+     if (cx->hash == NULL)
+ 	goto loser;
+ 
+Index: security/nss/lib/freebl/blapi.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/blapi.h,v
+retrieving revision 1.33
+diff -u -p -r1.33 blapi.h
+--- security/nss/lib/freebl/blapi.h	29 Mar 2009 03:45:32 -0000	1.33
++++ security/nss/lib/freebl/blapi.h	24 Sep 2009 15:16:39 -0000
+@@ -258,6 +258,14 @@ extern SECStatus ECDSA_SignDigestWithSee
+                                           const unsigned char *seed, 
+                                           const int           seedlen);
+ 
++/***************************************************************************
++** GOST R 34.10-2001 (EC DSA) algorithms.
++*/
++
++extern SECStatus
++GOST_R3410EL_VerifyDigest(const GOSTPublicKey *key, const SECItem *signature,
++    const SECItem *digest);
++
+ /******************************************/
+ /*
+ ** RC4 symmetric stream cypher
+@@ -1028,6 +1036,19 @@ extern SECStatus SHA384_Flatten(SHA384Co
+ extern SHA384Context * SHA384_Resurrect(unsigned char *space, void *arg);
+ extern void SHA384_Clone(SHA384Context *dest, SHA384Context *src);
+ 
++/******************************************/
++/* 
++** GOST R 34.11-94 hash function (RFC4357)
++*/
++extern GOSTR3411Context *GOSTR3411_NewContext(const SECItem *param);
++extern void GOSTR3411_DestroyContext(GOSTR3411Context *cx, PRBool freeit);
++extern void GOSTR3411_Begin(GOSTR3411Context *cx);
++extern void GOSTR3411_Update(GOSTR3411Context *cx, const unsigned char *input,
++			unsigned int inputLen);
++extern void GOSTR3411_End(GOSTR3411Context *cx, unsigned char *digest,
++		     unsigned int *digestLen, unsigned int maxDigestLen);
++extern unsigned int GOSTR3411_FlattenSize(GOSTR3411Context *cx);
++
+ /****************************************
+  * implement TLS Pseudo Random Function (PRF)
+  */
+Index: security/nss/lib/freebl/blapit.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/blapit.h,v
+retrieving revision 1.22
+diff -u -p -r1.22 blapit.h
+--- security/nss/lib/freebl/blapit.h	17 Dec 2008 06:09:12 -0000	1.22
++++ security/nss/lib/freebl/blapit.h	24 Sep 2009 15:16:39 -0000
+@@ -88,6 +88,10 @@
+  */
+ #define MAX_ECKEY_LEN 	        72	/* Bytes */
+ 
++#define GOST_R3410EL_KEY_LEN        32  /* Bytes (256 bits). See RFC4491. */
++#define GOST_R3410EL_PUBKEY_LEN     64  /* Q (pub.EC point):(x,y): 2x32 bytes */
++#define GOST_R3410EL_SIGNATURE_LEN  (2 * GOST_R3410EL_KEY_LEN)
++
+ /*
+  * Number of bytes each hash algorithm produces
+  */
+@@ -97,6 +101,7 @@
+ #define SHA256_LENGTH 		32 	/* bytes */
+ #define SHA384_LENGTH 		48 	/* bytes */
+ #define SHA512_LENGTH 		64 	/* bytes */
++#define GOSTR3411_LENGTH        32      /* bytes */
+ #define HASH_LENGTH_MAX         SHA512_LENGTH
+ 
+ /*
+@@ -109,6 +114,7 @@
+ #define SHA256_BLOCK_LENGTH 	 64 	/* bytes */
+ #define SHA384_BLOCK_LENGTH 	128 	/* bytes */
+ #define SHA512_BLOCK_LENGTH 	128 	/* bytes */
++#define GOSTR3411_BLOCK_LENGTH   32     /* bytes */
+ #define HASH_BLOCK_LENGTH_MAX 	SHA512_BLOCK_LENGTH
+ 
+ #define AES_KEY_WRAP_IV_BYTES    8
+@@ -190,7 +196,8 @@ struct SHA1ContextStr       ;
+ struct SHA256ContextStr     ;
+ struct SHA512ContextStr     ;
+ struct AESKeyWrapContextStr ;
+-struct SEEDContextStr       ;	
++struct SEEDContextStr       ;
++struct GOSTR3411ContextStr;
+ 
+ typedef struct DESContextStr        DESContext;
+ typedef struct RC2ContextStr        RC2Context;
+@@ -206,7 +213,8 @@ typedef struct SHA512ContextStr     SHA5
+ /* SHA384Context is really a SHA512ContextStr.  This is not a mistake. */
+ typedef struct SHA512ContextStr     SHA384Context;
+ typedef struct AESKeyWrapContextStr AESKeyWrapContext;
+-typedef struct SEEDContextStr	    SEEDContext;	
++typedef struct SEEDContextStr	    SEEDContext;
++typedef struct GOSTR3411ContextStr  GOSTR3411Context;
+ 
+ /***************************************************************************
+ ** RSA Public and Private Key structures
+@@ -300,7 +308,7 @@ struct DHPrivateKeyStr {
+ typedef struct DHPrivateKeyStr DHPrivateKey;
+ 
+ /***************************************************************************
+-** Data structures used for elliptic curve parameters and
++** Data structures used for X9.62 elliptic curve parameters and
+ ** public and private keys.
+ */
+ 
+@@ -371,6 +379,17 @@ struct ECPrivateKeyStr {
+ };
+ typedef struct ECPrivateKeyStr ECPrivateKey;
+ 
++/***************************************************************************
++** GOST R 34.10-2001 (EC DSA) - related data structures.
++*/
++
++struct GOSTPublicKeyStr {
++    ECParams ecParams;/*!< weird ECParams, because ec_points_mul() wants them */
++    SECItem value;    /*!< weird ECPoint,  because ec_points_mul() wants this */
++};
++
++typedef struct GOSTPublicKeyStr GOSTPublicKey;
++
+ typedef void * (*BLapiAllocateFunc)(void);
+ typedef void (*BLapiDestroyContextFunc)(void *cx, PRBool freeit);
+ typedef SECStatus (*BLapiInitContextFunc)(void *cx, 
+Index: security/nss/lib/freebl/ec.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/ec.c,v
+retrieving revision 1.20
+diff -u -p -r1.20 ec.c
+--- security/nss/lib/freebl/ec.c	18 Nov 2008 19:48:23 -0000	1.20
++++ security/nss/lib/freebl/ec.c	24 Sep 2009 15:16:39 -0000
+@@ -96,16 +96,16 @@ ec_points_mul(const ECParams *params, co
+     printf("\n");
+ 
+ 	if (k1 != NULL) {
+-		mp_tohex(k1, mpstr);
++		mp_tohex((mp_int *)k1, mpstr);
+ 		printf("ec_points_mul: scalar k1: %s\n", mpstr);
+-		mp_todecimal(k1, mpstr);
++		mp_todecimal((mp_int *)k1, mpstr);
+ 		printf("ec_points_mul: scalar k1: %s (dec)\n", mpstr);
+ 	}
+ 
+ 	if (k2 != NULL) {
+-		mp_tohex(k2, mpstr);
++		mp_tohex((mp_int *)k2, mpstr);
+ 		printf("ec_points_mul: scalar k2: %s\n", mpstr);
+-		mp_todecimal(k2, mpstr);
++		mp_todecimal((mp_int *)k2, mpstr);
+ 		printf("ec_points_mul: scalar k2: %s (dec)\n", mpstr);
+ 	}
+ 
+@@ -922,7 +922,7 @@ ECDSA_VerifyDigest(ECPublicKey *key, con
+     }
+ 
+     ecParams = &(key->ecParams);
+-    flen = (ecParams->fieldID.size + 7) >> 3;  
++    flen = BITLEN_TO_OCTETLEN( ecParams->fieldID.size );
+     olen = ecParams->order.len;  
+     if (signature->len == 0 || signature->len%2 != 0 ||
+ 	signature->len > 2*olen) {
+@@ -1087,3 +1087,129 @@ cleanup:
+     return rv;
+ }
+ 
++/*! For uniformity, entities in GOST_R3410EL_VerifyDigest are named like those
++    in ECDSA_VerifyDigest. I.e. according X9.62, not GOST R 34.10-2001.
++    The goal is to keep source code of both procedures as close as possible.
++ */
++SECStatus
++GOST_R3410EL_VerifyDigest(const GOSTPublicKey *key, const SECItem *signature,
++                 const SECItem *digest)
++{
++    SECStatus rv = SECFailure;
++#ifndef NSS_ENABLE_ECC
++    PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
++#else
++    mp_int r_, s_;           /* tuple (r', s') is received signature) */
++    mp_int n;
++    mp_int t, v, z;          /* intermediate values used in verification */
++    mp_err err = MP_OKAY;
++    const ECParams *ecParams = NULL;
++    SECItem pointC = { siBuffer, NULL, 0 };
++    int slen;       /* length in bytes of a half signature (r or s) */
++    int flen;       /* length in bytes of the field size */
++    unsigned olen;  /* length in bytes of the base point order */
++
++    /* Initialize MPI integers. */
++    /* must happen before the first potential call to cleanup */
++    MP_DIGITS(&r_) = 0;
++    MP_DIGITS(&s_) = 0;
++    MP_DIGITS(&n)  = 0;
++    MP_DIGITS(&t)  = 0;
++    MP_DIGITS(&v)  = 0;
++    MP_DIGITS(&z)  = 0;
++
++    if (!key || !signature || !digest) {
++	PORT_SetError(SEC_ERROR_INVALID_ARGS);
++	goto cleanup;
++    }
++
++    ecParams = &(key->ecParams);
++    flen = BITLEN_TO_OCTETLEN( ecParams->fieldID.size );
++    olen = ecParams->order.len;
++    if (signature->len == 0 || signature->len%2 != 0 ||
++	signature->len > 2*olen) {
++	PORT_SetError(SEC_ERROR_INPUT_LEN);
++	goto cleanup;
++    }
++    slen = signature->len/2;
++
++    if( NULL == SECITEM_AllocItem(NULL, &pointC, 2*flen + 1) )
++	goto cleanup; /* error set by SECITEM_AllocItem */
++
++    CHECK_MPI_OK( mp_init(&r_) );
++    CHECK_MPI_OK( mp_init(&s_) );
++    CHECK_MPI_OK( mp_init(&n)  );
++    CHECK_MPI_OK( mp_init(&t)  );
++    CHECK_MPI_OK( mp_init(&v)  );
++    CHECK_MPI_OK( mp_init(&z)  );
++
++    /*  Convert received signature (r', s') into MPI integers.
++        (RFC4491, Section 2.2.1, page 4)
++    */
++    CHECK_MPI_OK( mp_read_unsigned_octets(&s_, signature->data, slen) );
++    CHECK_MPI_OK( mp_read_unsigned_octets(&r_, signature->data + slen, slen) );
++
++    /* GOST R 34.10-2001, Section 6.2, Step 1
++        vrfy: 0 < r' < n,  0 < s' < n
++    */
++    SECITEM_TO_MPINT(ecParams->order, &n);
++    if( mp_cmp_z(&r_) <= 0 || mp_cmp_z(&s_) <= 0 ||
++        mp_cmp(&r_, &n) >= 0 || mp_cmp(&s_, &n) >= 0) {
++	PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
++	goto cleanup; /* will return rv == SECFailure */
++    }
++    /* GOST R 34.10-2001, Section 6.2, Step 3
++        e = HASH(M') mod n; e = 1 if e = 0;
++    */
++    SECITEM_TO_MPINT( *digest, &v ); /* v = HASH(M') */
++    CHECK_MPI_OK( mp_mod(&v, &n, &t ) );
++    if( mp_cmp_z( &t ) == 0 ) {
++        CHECK_MPI_OK( mp_set_int( &t, 1 ) );
++    }
++    /* GOST R 34.10-2001, Section 6.2, Step 4
++        v = e**-1 mod n
++    */
++    CHECK_MPI_OK( mp_invmod(&t, &n, &v) );
++
++    /* GOST R 34.10-2001, Section 6.2, Step 5
++        z1 = s'*v mod n; z2 = -r'*v mod n
++    */
++    CHECK_MPI_OK( mp_mulmod(&r_, &v, &n, &t ) ); /* r'*v mod n */
++    CHECK_MPI_OK( mp_neg( &t, &t ) );            /* - (r'*v mod n)*/
++    CHECK_MPI_OK( mp_mod( &t, &n, &z ) );        /* (-r'*v) mod n */
++    CHECK_MPI_OK( mp_mulmod(&s_, &v, &n, &t ) ); /* s'*v mod n */
++    
++    /* GOST R 34.10-2001, Section 6.2, Step 6
++        C = z1*G + z2*Q; R = Xc mod n
++    */
++    if( SECSuccess != ec_points_mul( ecParams, &t, &z, &key->value, &pointC ))
++        goto cleanup; /* error set by ec_points_mul */
++    CHECK_MPI_OK( mp_read_unsigned_octets( &t, pointC.data + 1, flen) );
++    CHECK_MPI_OK( mp_mod( &t, &n, &z ) ); /* R <- Xc mod n */
++
++    /* GOST R 34.10-2001, Section 6.2, Step 7
++        vrfy: R == r'
++    */
++    if( mp_cmp( &z, &r_ ) != 0 ) {
++	PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
++        goto cleanup;
++    }
++
++    rv = SECSuccess; /* Signature verified. */
++cleanup:
++    mp_clear(&r_);
++    mp_clear(&s_);
++    mp_clear(&n);
++    mp_clear(&t);
++    mp_clear(&v);
++    mp_clear(&z);
++
++    if (pointC.data) SECITEM_FreeItem(&pointC, PR_FALSE);
++    if (err) {
++	MP_TO_SEC_ERROR(err);
++	rv = SECFailure;
++    }
++
++#endif /* NSS_ENABLE_ECC */
++    return rv;
++}
+Index: security/nss/lib/freebl/ec.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/ec.h,v
+retrieving revision 1.2
+diff -u -p -r1.2 ec.h
+--- security/nss/lib/freebl/ec.h	25 Apr 2004 15:03:08 -0000	1.2
++++ security/nss/lib/freebl/ec.h	24 Sep 2009 15:16:39 -0000
+@@ -48,5 +48,6 @@
+ 
+ #define ANSI_X962_CURVE_OID_TOTAL_LEN    10
+ #define SECG_CURVE_OID_TOTAL_LEN          7
++#define CRYPTOPRO_CURVE_OID_TOTAL_LEN     9 /* (6,7) 1.2.643.2.2.35.{0,1,2,3} */
+ 
+ #endif /* __ec_h_ */
+Index: security/nss/lib/freebl/gost28147-priv.h
+===================================================================
+RCS file: security/nss/lib/freebl/gost28147-priv.h
+diff -N security/nss/lib/freebl/gost28147-priv.h
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ security/nss/lib/freebl/gost28147-priv.h	24 Sep 2009 15:16:39 -0000
+@@ -0,0 +1,93 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Initial Developer of the Original Code is Swemel JSC (http://swemel.ru)
++ * Portions created by the Initial Developer are Copyright (C) 2009
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Konstantin Andreev <ka@nx.int.ru>, Swemel JSC (http://swemel.ru)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++/* $Id$ */
++/* \file
++    GOST 28147-89 algorithms private declarations.
++
++    Depends only from NSPR. Do not include NSS headers.
++ */
++
++#ifndef GOST28147_89_PRIV_INC_H_
++#define GOST28147_89_PRIV_INC_H_
++
++#include <prtypes.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/*! \typedef VInt Builtin integer type which forms I256.
++    \details 64 bit native integer (if available) or 32 bit.
++ */
++/*! \define  BITS_PER_VINT Number of bits in VInt
++ */
++#ifdef HAVE_LONG_LONG
++typedef PRUint64 VInt;
++#define BITS_PER_VINT 64
++#else
++typedef PRUint32 VInt;
++#define BITS_PER_VINT 32
++#endif
++
++#define BYTES_PER_I256   32
++#define I256_NELEM (BYTES_PER_I256/sizeof(VInt))
++#define  I64_NELEM (8/sizeof(VInt))
++
++/*! Long 256-bit integer.
++    \details Array of native integers in a machine native (BE/LE) order.
++     This decision is made to minimize big/little endian conversions at runtime.
++     Integers are either 64-bits (if available natively) or 32 bits.
++*/
++typedef VInt I256 [ I256_NELEM ];
++/*! Long 64-bit integer. */
++typedef VInt I64  [  I64_NELEM ];
++
++/*! GOST 28147-89 encryption step parameter - substitution table.
++ */
++typedef enum {
++    gost28147Tab_gostR3411CryptoProA,
++    gost28147Tab_Invalid /* Table n/a. Must be last item in this enum */
++} Gost28147SubstTable;
++
++/*! Encrypt 64-bit block on 256-bit key [GOST 28147-89]
++    \details Do not pass invalid subst.table.
++ */
++void
++Gost28147_EncryptStep( I64 dst, const I64 data, const I256 key,
++        Gost28147SubstTable tabNo );
++
++#ifdef __cplusplus
++}
++#endif
++#endif /* GOST28147_89_PRIV_INC_H_ */
+Index: security/nss/lib/freebl/gost28147.c
+===================================================================
+RCS file: security/nss/lib/freebl/gost28147.c
+diff -N security/nss/lib/freebl/gost28147.c
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ security/nss/lib/freebl/gost28147.c	24 Sep 2009 15:16:39 -0000
+@@ -0,0 +1,120 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Initial Developer of the Original Code is Swemel JSC (http://swemel.ru)
++ * Portions created by the Initial Developer are Copyright (C) 2009
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Konstantin Andreev <ka@nx.int.ru>, Swemel JSC (http://swemel.ru)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++/* $Id$ */
++/* \file
++    GOST 28147-89 algorithms (see RFC4357)
++
++    Depends only from NSPR. Do not include NSS headers.
++*/
++
++#include "gost28147-priv.h"
++
++/*! \define I64_HI32_IDX Index of high 32-bit word in a 64-bit integer. */
++/*! \define I64_LO32_IDX Index of low  32-bit word in a 64-bit integer. */
++
++#ifdef IS_LITTLE_ENDIAN
++#  define I64_HI32_IDX 1
++#  define I64_LO32_IDX 0
++#else
++#  define I64_HI32_IDX 0
++#  define I64_LO32_IDX 1
++#endif
++
++static const unsigned char * const substTables[];
++
++void
++Gost28147_EncryptStep( I64 dst, const I64 data, const I256 key,
++        Gost28147SubstTable tabNo )
++{
++    const unsigned char * const tab = substTables[ tabNo ];
++    PRUint32    /* encryption buffer */
++            hi32 = ((const PRUint32 *)data)[ I64_HI32_IDX ],
++            lo32 = ((const PRUint32 *)data)[ I64_LO32_IDX ];
++    PRUint32 f; /* round function */
++    PRUint8 j, m, n;
++
++    /* Using pointer arithm. for key schedule is disaster, because of:
++        -- if/elif/else,  -- ptr shall not go before a[0] (BE archs).
++       Let use index expression instead.
++     */
++    for( j = 0; j < 32; ++ j ) {
++        n = (m = (23 - j)) >> 5; /* j<24: =0, j>=24: =7 */
++        f = lo32 + ((const PRUint32 *)key) [
++            /* key schedule for ... */
++#ifdef IS_LITTLE_ENDIAN
++            (j & ~n & 7) | (m & n)  /* LE: 0..7 0..7 0..7 7..0 */
++#else
++            (j & n) | (m & ~n & 7)  /* BE: 7..0 7..0 7..0 0..7 */
++#endif
++        ]; /* lo32 + round key */
++
++        /*  Substitution. No loop, no addr.arith., one memory var,
++            - good chance the compiler will streamline this on registers.
++         */
++        f =
++            (0x0F & tab [      ((f      ) &0x0F) ])       |
++            (0xF0 & tab [      ((f >>  4) &0x0F) ])       |
++            (0x0F & tab [ 16 + ((f >>  8) &0x0F) ]) <<  8 |
++            (0xF0 & tab [ 16 + ((f >> 12) &0x0F) ]) <<  8 |
++            (0x0F & tab [ 32 + ((f >> 16) &0x0F) ]) << 16 |
++            (0xF0 & tab [ 32 + ((f >> 20) &0x0F) ]) << 16 |
++            (0x0F & tab [ 48 + ((f >> 24) &0x0F) ]) << 24 |
++            (0xF0 & tab [ 48 + ((f >> 28) &0x0F) ]) << 24;
++
++        f = hi32 ^ (( f<<11 )|( f>>21 )); /* rol f, 11 */
++        hi32 = lo32; lo32 = f;
++    } /* round */
++
++    /* swap last round results */
++    ((PRUint32 *)dst)[ I64_LO32_IDX ] = hi32;
++    ((PRUint32 *)dst)[ I64_HI32_IDX ] = lo32;
++} /* Gost28147_EncryptStep */
++
++/* -------------------------------------------------------------- */
++
++/* GostR3411-94-CryptoPro-A */
++static const unsigned char _gostR3411CryptoProA[64] = {
++    0x5a, 0xf4, 0x45, 0x06, 0x28, 0xd1, 0xb3, 0x97,
++    0x1d, 0x7c, 0x6e, 0x30, 0xc9, 0xe2, 0xab, 0x8f,
++    0x47, 0xaf, 0x7c, 0xce, 0x09, 0xf4, 0x21, 0x80,
++    0xe3, 0x1b, 0x65, 0x52, 0xd6, 0xba, 0x98, 0x3d,
++    0x77, 0x66, 0x24, 0x4b, 0xd9, 0x9c, 0xf2, 0x0a,
++    0xa1, 0x18, 0x50, 0xbe, 0x8f, 0xed, 0xc3, 0x35,
++    0x1d, 0x3e, 0xa4, 0x91, 0x57, 0xb0, 0x45, 0xfa,
++    0x83, 0x6c, 0x78, 0xef, 0xd6, 0x02, 0x29, 0xcb
++};
++
++static const unsigned char * const substTables[] = {
++    _gostR3411CryptoProA
++};
+Index: security/nss/lib/freebl/gost3411.c
+===================================================================
+RCS file: security/nss/lib/freebl/gost3411.c
+diff -N security/nss/lib/freebl/gost3411.c
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ security/nss/lib/freebl/gost3411.c	24 Sep 2009 15:16:39 -0000
+@@ -0,0 +1,585 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Initial Developer of the Original Code is Swemel JSC (http://swemel.ru)
++ * Portions created by the Initial Developer are Copyright (C) 2009
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Konstantin Andreev <ka@nx.int.ru>, Swemel JSC (http://swemel.ru)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++/* $Id$ */
++/* \file
++    GOST R 34.11-94 hash step function.
++
++    Depends only from NSPR. Do not include NSS headers.
++ */
++
++#include <prtypes.h>
++#include "gost28147-priv.h"
++#include "gost3411.h"
++#include <string.h> /* for memcmp() */
++
++/*! \define PR_UINT64 Portable construction of UINT64 literals.
++    \details Current NSPR v.4.8 has no macros PR_UINT64 or LL_UINIT. 
++        Let synthesize PR_UINT64.
++        Platform detection code is taken from current prtypes.h, prlong.h.
++*/
++#if defined(HAVE_LONG_LONG) && !defined(PR_UINT64)
++#  if PR_BYTES_PER_LONG == 8 && !defined(__APPLE__)
++#    define PR_UINT64(x) x ## UL
++#  elif defined(WIN32) && !defined(__GNUC__)
++#    define PR_UINT64(x) x ## ui64
++#  else
++#    define PR_UINT64(x) x ## ULL
++#  endif
++#endif /* HAVE_LONG_LONG w/o PR_UINT64 */
++
++/*! \define UNALIGNED_INT_ACCESS Hardware allows access to unaligned integers.
++
++    Intel x86 supports unaligned access. Chk x86 :
++        -- myself for compilers : gcc, sun, microsoft.
++        -- from macro NSS_X86_OR_X64, defined in NSS makefiles
++    If other archs support unaligned access, they can be added here as well.
++    Package maintainers can also define UNALIGNED_INT_ACCESS externally.
++*/
++#ifndef UNALIGNED_INT_ACCESS
++#  if defined(NSS_X86_OR_X64) \
++   || ( (defined(__GNUC__) || defined(__SUNPRO_C)) && \
++            (defined(__i386) || defined(__x86_64) || defined(__amd64)) ) \
++   || ( defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64) ))
++#  define UNALIGNED_INT_ACCESS
++#  endif
++#endif /* !UNALIGNED_INT_ACCESS */
++
++/*! \define LTOH_DIR direction from least to most significant byte/int. */
++/*! \define LTOH_INC advance ptr to most significant byte direction. */
++/*! \define LTOH_DEC advance ptr to least significant byte direction. */
++/*! \define I256_VINT_IDX position of constituting VInt in array. */
++
++#ifdef IS_LITTLE_ENDIAN
++#  define LTOH_DIR 1
++#  define LTOH_INC( ptr ) (++(ptr))
++#  define LTOH_DEC( ptr ) (--(ptr))
++#  define I256_VINT_IDX( n ) (n)
++#else
++#  define LTOH_DIR (-1)
++#  define LTOH_INC( ptr ) (--(ptr))
++#  define LTOH_DEC( ptr ) (++(ptr))
++#  define I256_VINT_IDX( n ) (I256_NELEM - 1 - (n))
++#endif
++
++/*! Key generation constant C3 [GOST R 34.11-94, section 5.1]
++*/
++static const I256 GenKeys_C3 =
++{
++#ifdef HAVE_LONG_LONG
++#  ifdef IS_LITTLE_ENDIAN
++    PR_UINT64(0xff00ff00ff00ff00), PR_UINT64(0x00ff00ff00ff00ff),
++    PR_UINT64(0xff0000ff00ffff00), PR_UINT64(0xff00ffff000000ff)
++#  else
++    PR_UINT64(0xff00ffff000000ff), PR_UINT64(0xff0000ff00ffff00),
++    PR_UINT64(0x00ff00ff00ff00ff), PR_UINT64(0xff00ff00ff00ff00)
++#  endif
++#else   /* 32-bit ints */
++#  ifdef IS_LITTLE_ENDIAN
++    PR_UINT32(0xff00ff00), PR_UINT32(0xff00ff00), PR_UINT32(0x00ff00ff),
++    PR_UINT32(0x00ff00ff), PR_UINT32(0x00ffff00), PR_UINT32(0xff0000ff),
++    PR_UINT32(0x000000ff), PR_UINT32(0xff00ffff)
++#  else
++    PR_UINT32(0xff00ffff), PR_UINT32(0x000000ff), PR_UINT32(0xff0000ff),
++    PR_UINT32(0x00ffff00), PR_UINT32(0x00ff00ff), PR_UINT32(0x00ff00ff),
++    PR_UINT32(0xff00ff00), PR_UINT32(0xff00ff00)
++#  endif
++#endif  /* 32-bit ints */
++};
++
++/*! "A" transform (inplace) [GOST R 34.11-94, section 5.1]
++    \return v
++ */
++static VInt *
++A( I256 v ) {
++    I64 t;
++    int j, k;
++#ifdef IS_LITTLE_ENDIAN
++    /* t <- x1 */
++    for( j = 0; j < I64_NELEM; ++j )
++        t[j] = v[j];
++    /* v (x4|x3|x2|x1) >> 64 */
++    for( j = I64_NELEM, k = 0; j < I256_NELEM; ++ j, ++k )
++        v[k] = v[j];
++    /* x4 <- x1 ^ x2 */
++    for( j = 0, k = I256_NELEM - I64_NELEM; j < I64_NELEM; ++j, ++k )
++        v[k] = v[j] ^ t[j];
++#else /* BE */
++    for( j = I256_NELEM - I64_NELEM, k = 0; j < I256_NELEM; ++j, ++k )
++        t[k] = v[j];
++    for( j = I256_NELEM - I64_NELEM - 1, k = I256_NELEM - 1; j >= 0; --j, --k )
++        v[k] = v[j];
++    for( j = I256_NELEM - I64_NELEM, k = 0; j < I256_NELEM; ++j, ++ k )
++        v[k] = v[j] ^ t[k];
++#endif
++    return v;
++} /* A */
++
++/*! "P" transform [GOST R 34.11-94, section 5.1]
++    \details dst must not be src
++*/
++static void
++P( I256 dst, const I256 src ) {
++    /*  Transform is symmetric to the I256 BE/LE arrangement.
++     */
++    PRUint8 *s = (PRUint8 *)src, *p,
++            *d = (PRUint8 *)dst;
++    int i, k;
++
++    for( k = 0; k < 4; ++ k ) {
++        p = d++;
++        for( i = 0; i < 8; ++ i ) {
++            *p = *s++; p += 4;
++        }
++    }
++} /* P */
++
++/*! dst = 0
++ */
++static void
++I256_zero( I256 dst ) {
++    int j;
++    for( j = 0; j < I256_NELEM; ++ j )
++        *dst++ = 0;
++}
++
++/*! Load I256 from 256-bit little-endian integer.
++    \param v Buffer with 256-bit little-endian integer. There is no guarantee
++        about buffer aligning.
++    \details compiles in 6 versions: {BE,LE align,LE unalign}*{64|32 bit ints}
++    \return dst
++ */
++static VInt *
++I256_loadLeBytes( I256 dst, const void * m )
++{
++    VInt       *d_p   = dst + I256_VINT_IDX(0);               /* LS int */
++    const VInt *d_end = dst + I256_VINT_IDX(I256_NELEM - 1);  /* MS int */
++
++    /* LE with unaligned access: dereference v directly: *(VInt *)v */
++#ifdef UNALIGNED_INT_ACCESS
++    const VInt *v_p = (const VInt *)m;
++#else  /* LE with aligned integers or BE */
++    const unsigned char *b_p = (const unsigned char *)m;
++#endif
++
++    for(;;) {
++        *d_p =
++#ifdef UNALIGNED_INT_ACCESS
++            *v_p++;
++#else  /* LE with aligned integers or BE */
++            ((VInt)*b_p)          | ((VInt)b_p[1] << 8 )
++          | ((VInt)b_p[2] << 16 ) | ((VInt)b_p[3] << 24)
++#ifdef HAVE_LONG_LONG
++          | ((VInt)b_p[4] << 32 ) | ((VInt)b_p[5] << 40)
++          | ((VInt)b_p[6] << 48 ) | ((VInt)b_p[7] << 56)
++#endif
++        ; /* end of *d_p = */
++        b_p += sizeof(VInt);
++#endif /* LE/aligned or BE */
++
++        if( d_p == d_end ) /* d_p shall not go above dst[0] */
++            break;
++        LTOH_INC(d_p);
++    } /* more signif. int in dst */
++
++    return dst;
++} /* I256_loadLeBytes */
++
++/*! Store I256 into buffer, most significant byte first (BE byte order).
++    This is how NSS expects hash value to be returned.
++*/
++static void
++I256_storBeBytes( void *m, const I256 v )
++{
++    const VInt * v_p   = v + I256_VINT_IDX(I256_NELEM - 1), /* MS int */
++               * v_end = v + I256_VINT_IDX(0);              /* LS int */
++
++    unsigned char *b_p = (unsigned char *)m;
++    VInt t;
++
++    for(;;) {
++        t = *v_p;
++#ifdef HAVE_LONG_LONG
++        *b_p++ = (unsigned char)(t >> 56);
++        *b_p++ = (unsigned char)(t >> 48);
++        *b_p++ = (unsigned char)(t >> 40);
++        *b_p++ = (unsigned char)(t >> 32);
++#endif
++        *b_p++ = (unsigned char)(t >> 24);
++        *b_p++ = (unsigned char)(t >> 16);
++        *b_p++ = (unsigned char)(t >>  8);
++        *b_p++ = (unsigned char)(t      );
++        if( v_p == v_end ) /* v_p shall not go above v[0] */
++            break;
++        LTOH_DEC(v_p);
++    }
++}
++
++static void
++I256_assign( I256 dst, const I256 src ) {
++    int j;
++    for( j = 0; j < I256_NELEM; ++ j )
++        *dst++ = *src++;
++}
++
++/*! dst = v1 ^ v2.
++    \details dst may be the same with v1 or v2.
++    \return dst
++ */
++static VInt *
++I256_xor( I256 dst, const I256 v1, const I256 v2 ) {
++    VInt *d = dst;
++    int j;
++    for( j = 0; j < I256_NELEM; ++ j )
++        *d++ = *v1++ ^ *v2++;
++    return dst;
++}
++
++/*! Generate keys [GOST R 34.11-94, section 5.1]
++ */
++static void
++GenKeys( I256 k[], const I256 h, const I256 m ) {
++    I256 u, v, w;
++    int j;
++
++    I256_assign( u, h );
++    I256_assign( v, m );
++
++    for( j = 0;; ++ j ) {
++        I256_xor( w, u, v ); P( k[j], w ); /* Kj assigned */
++        if( j == 3 )
++            break;
++        A(A(v));
++        A(u);
++        if( j == 1 )
++            I256_xor( u, u, GenKeys_C3 );
++    } /* next Kj */
++}
++
++/*! ψ (psi) transform (inplace) [GOST R 34.11-94, section 5.3]
++    \param order How many times apply ψ transform to I256
++    \return Input I256
++ */
++static VInt *
++psi( I256 v, unsigned order ) {
++    VInt lo, hi;       /* low, high VInt's */
++#ifndef HAVE_LONG_LONG /* 32-bit ints */
++    VInt l2, h2;       /* neighbours of lo, hi */
++#endif
++    PRUint16    t;
++    int         j;
++
++    for( ; order != 0; -- order )
++    {
++        /* t <-  highest 16 bit of result */
++        lo = v[ I256_VINT_IDX(0) ];
++        hi = v[ I256_VINT_IDX(I256_NELEM - 1) ];
++#ifndef HAVE_LONG_LONG /* 32-bit ints */
++        l2 = v[ I256_VINT_IDX(1) ];
++        h2 = v[ I256_VINT_IDX(I256_NELEM - 2) ];
++#endif
++        t = (PRUint16)( lo ^ (lo >> 16) ^
++#ifdef HAVE_LONG_LONG /* 64-bit ints */
++            (lo >> 32) ^ (lo >> 48) ^ hi ^ (hi >> 48));
++#else   /* 32-bit ints */
++            l2 ^ (l2 >> 16) ^ h2 ^ (hi >> 16));
++#endif
++        /* v <-  t ||| v >> 16 */
++        for( j = I256_VINT_IDX(I256_NELEM - 1);
++            j != (I256_VINT_IDX(0) - LTOH_DIR); LTOH_DEC(j) )
++        {
++            v[j] = ((lo = v[j]) >> 16) | ((VInt)t << (BITS_PER_VINT - 16));
++            t = (PRUint16)lo;
++        }
++    } /* next Ksi */
++    return v;
++}
++
++/*! sum += item mod 2**256
++    \sa I256_add8n
++ */
++static void
++I256_add( I256 sum, const I256 item )
++{
++    const VInt  *i_p   = item + I256_VINT_IDX(0);
++    VInt        *s_p   =  sum + I256_VINT_IDX(0),
++                *s_end =  sum + I256_VINT_IDX(I256_NELEM - 1);
++
++    VInt x, y, s; /* item, item, temp sum */
++    int c = 0;    /* carry */
++
++    for(;;) {
++        *s_p = s = (x = *s_p) + (y = *i_p) + c;
++        if( s_p == s_end ) /* X_p shall not go above array[0] */
++            break;
++        /*  calc. carry (overflow detection). See section 2.15 in:
++            Warren H.S. Hacker's Delight. - Addison-Wesley, 2002
++         */
++        c = (( x & y ) | ( (x | y) & ~s )) >> (BITS_PER_VINT-1);
++        LTOH_INC(s_p);
++        LTOH_INC(i_p);
++    }
++}
++
++/*! sum += 8*n mod 2**256
++    \details If 'n' is number of bytes, this results in adding number of bits.
++    \sa I256_add
++ */
++static void
++I256_add8n( I256 sum, VInt n )
++{
++    VInt *s_p   = sum + I256_VINT_IDX(0),
++         *s_end = sum + I256_VINT_IDX(I256_NELEM - 1);
++
++    /* (8*n) is (n << 3): spread over two VInt's.
++       adding lowest VInt */
++    VInt y = n << 3;
++    VInt x = *s_p, s = x + y;
++    int c = (( x & y ) | ( (x | y) & ~s )) >> (BITS_PER_VINT-1); /* 1st carry */
++    *s_p = s; LTOH_INC(s_p);
++
++    /* adding highest VInt */
++    *s_p = s = (x = *s_p) + (y = n >> (BITS_PER_VINT - 3)) + c;
++    c = (( x & y ) | ( (x | y) & ~s )) >> (BITS_PER_VINT-1);
++
++    /* adding carry. */
++    do {
++        LTOH_INC(s_p);
++        *s_p = s = (x = *s_p) + c;
++        c = ( x & ~s ) >> (BITS_PER_VINT-1);
++    } while( s_p != s_end  &&  c != 0 );
++}
++
++/*! Hash step, - ϰ (kappa) function. [GOST R 34.11-94, section 5.3, last parag]
++    \param h - [in] hash value of prev.iter., [out] hash value of this iter.
++    \param m - next block of message being hashed
++*/
++static void /* GostR3411_HashStep ? */
++HStep( I256 h, const I256 m, Gost28147SubstTable tabNo ) {
++    I256 s; /* evolving hash value */
++    int j;
++    /*      Let  H = (h4 || h3 || h2 || h1)
++            Then S = E(h4,K4) || E(h3, K3) || E(h2, K2) || E(h1, K1)
++     */
++    {
++        I256 K[4];
++        PRUint32
++#ifdef IS_LITTLE_ENDIAN
++                *s_p = (PRUint32 *)s,
++                *h_p = (PRUint32 *)h;
++#else
++                *s_p = (PRUint32 *)s + 6,
++                *h_p = (PRUint32 *)h + 6;
++#endif
++
++        GenKeys( K, h, m );
++
++        for( j = 0; ; ) {
++            Gost28147_EncryptStep( (VInt *)s_p, (const VInt *)h_p, K[ j ],
++                tabNo );
++            if( ++j == 4 ) break; /* X_p shall not go above X[0] */
++            s_p += (LTOH_DIR << 1);
++            h_p += (LTOH_DIR << 1);
++        }
++    }
++    /* ϰ(M,H) = ψ**61( H ^ ψ( M ^ ψ**12(S) )) */
++    I256_assign( h,
++        psi( I256_xor( s, h, psi( I256_xor( s, m, psi( s, 12 )), 1 )), 61 )
++    );
++} /* HStep */
++
++/* -------------------------------------------------------------------------
++    blapi.h (freebl) interface implementation
++ -------------------------------------------------------------------------- */
++
++struct GOSTR3411ContextStr {
++    I256    H,  /*!< latest hash value */
++            S,  /*!< checksum */
++            L;  /*!< number of hashed bits */
++    unsigned char
++            inBuf[ BYTES_PER_I256 ];
++    Gost28147SubstTable tabNo;
++};
++
++typedef struct GOSTR3411ContextStr  GOSTR3411Context;
++
++unsigned int
++GostR3411_FlattenSizeImp( GOSTR3411Context *cx ) {
++    return sizeof(GOSTR3411Context);
++}
++
++void
++GostR3411_BeginImp( GOSTR3411Context *cx ) {
++    if( cx ) {
++        I256_zero( cx->H );
++        I256_zero( cx->S );
++        I256_zero( cx->L );
++    }
++}
++
++void
++GostR3411_ClearImp( GOSTR3411Context *cx ) {
++    GostR3411_BeginImp( cx );
++    cx->tabNo = gost28147Tab_Invalid;
++}
++
++void
++GostR3411_UpdateImp( GOSTR3411Context *cx, const unsigned char *input,
++    unsigned int inputLen )
++{
++    unsigned bufLen = /* #hashed_bytes % block_size */
++        ((cx->L)[ I256_VINT_IDX(0) ] >> 3) & 31;
++    unsigned needForFullBlock = BYTES_PER_I256 - bufLen;
++
++    /*  Hmm... Am I called with damaged context ? Can't signal error, give up */
++    if( cx->tabNo >= gost28147Tab_Invalid )
++        return;
++
++    I256_add8n( cx->L, inputLen );
++
++    /* block not filled yet */
++    if( inputLen < needForFullBlock ) {
++        memcpy( cx->inBuf + bufLen, input, inputLen );
++    } else {
++        I256 B; /* nxt blk */
++        /* old remainder in a buffer */
++        if( bufLen ) {
++            memcpy( cx->inBuf + bufLen, input, needForFullBlock );
++            inputLen -= needForFullBlock;
++            input    += needForFullBlock;
++
++            I256_loadLeBytes( B, cx->inBuf );
++            I256_add( cx->S, B );
++            HStep   ( cx->H, B, cx->tabNo );
++        }
++        /* full blocks */
++        while( inputLen >= BYTES_PER_I256 )
++        {
++            I256_loadLeBytes( B, input );
++            inputLen -= BYTES_PER_I256;
++            input    += BYTES_PER_I256;
++
++            I256_add( cx->S, B );
++            HStep   ( cx->H, B, cx->tabNo );
++        }
++        /* block remainder */
++        if( inputLen )
++            memcpy( cx->inBuf, input, inputLen );
++    } /* there are blocks */
++} /* GostR3411_UpdateImp */
++
++void
++GostR3411_EndImp( GOSTR3411Context *cx, unsigned char *digest,
++    unsigned int *digestLen, unsigned int maxDigestLen )
++{
++    unsigned bufLen = /* #hashed_bytes % block_size */
++        ((cx->L)[ I256_VINT_IDX(0) ] >> 3) & 31;
++
++    /*  Hmm... Am I called with damaged context ? Trying to signal error... */
++    if( cx->tabNo >= gost28147Tab_Invalid ) {
++        if (digestLen)
++            *digestLen = 0;
++        return;
++    }
++
++    /* pad remainder and hash it */
++    if( bufLen ) {
++        I256 B;
++        memset( cx->inBuf + bufLen, 0, BYTES_PER_I256 - bufLen );
++        I256_loadLeBytes( B, cx->inBuf );
++        I256_add( cx->S, B );
++        HStep   ( cx->H, B, cx->tabNo );
++    }
++    /* finalize hash */
++    HStep( cx->H, cx->L, cx->tabNo );
++    HStep( cx->H, cx->S, cx->tabNo );
++    /* copy out */
++    if( maxDigestLen >= BYTES_PER_I256 )
++        I256_storBeBytes( digest, cx->H );
++    else {
++        I256_storBeBytes( cx->inBuf, cx->H );
++        memcpy( digest, cx->inBuf, maxDigestLen );
++    }
++    if (digestLen)
++	*digestLen = BYTES_PER_I256;
++}
++
++/*  --------------------------------------------------------------------------
++    Digest parameters.
++        DER-encoded OIDs, tag-length prefix included.
++        There is no need to place this OIDs into global OID table @ secoid.c
++*/
++static const unsigned char
++  /* 1.2.643.2.2.30.1 (see RFC4357, PKCS#11 v2.30) */
++  CryptoProA[] = {0x06,0x07,0x2a,0x85,0x03,0x02,0x02,0x1e,0x02};
++  /* CryptoPro: reserved, but not defined at the moment:
++        1.2.643.2.2.30.{2,3,4}
++     Swemel JSC: some nondisclosed parameters reserved for government
++            organizations. For use in private builds.
++        1.3.6.1.4.1.31113.30.*
++  */
++
++static const struct {
++    const unsigned char     * derOid;
++    PRUint8                 derOidLen;
++    Gost28147SubstTable     tabNo;
++}
++    digestParams[] = {
++      { CryptoProA, sizeof(CryptoProA), gost28147Tab_gostR3411CryptoProA } /*,
++      { SwemelNIIA, sizeof(SwemelNIIA), gost28147Tab_gostR3411SwemelNIIA },*/
++    };
++
++#define DIGEST_NPARAMS (sizeof(digestParams)/sizeof(digestParams[0]))
++
++PRBool
++GostR3411_InitContextImp( struct GOSTR3411ContextStr *cx, void *param,
++    unsigned int paramLen )
++{
++    int j;
++
++    if( paramLen == 0 ) /* use default (see RFC4357) */
++        j = 0;
++    else                /* search for known OID */
++        for( j = 0; j < DIGEST_NPARAMS; ++j )
++            if( (paramLen == digestParams[j].derOidLen) &&
++                    (0 == memcmp( param, digestParams[j].derOid, paramLen )) 
++            )
++                break;
++
++    if( j == DIGEST_NPARAMS )
++        return PR_FALSE;
++
++    cx->tabNo = digestParams[j].tabNo;
++    GostR3411_BeginImp( cx );
++    return PR_TRUE;
++}
+Index: security/nss/lib/freebl/gost3411.h
+===================================================================
+RCS file: security/nss/lib/freebl/gost3411.h
+diff -N security/nss/lib/freebl/gost3411.h
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ security/nss/lib/freebl/gost3411.h	24 Sep 2009 15:16:39 -0000
+@@ -0,0 +1,77 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Initial Developer of the Original Code is Swemel JSC (http://swemel.ru)
++ * Portions created by the Initial Developer are Copyright (C) 2009
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Konstantin Andreev <ka@nx.int.ru>, Swemel JSC (http://swemel.ru)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++/* $Id$ */
++/* \file
++    GOST R 34.11-94 - blapi.h (freebl) interface implementation.
++
++    Depends only from NSPR. Do not include NSS headers. 
++    But for use alongside NSS headers.
++ */
++
++#ifndef GOSTR3411_94_INC_H_
++#define GOSTR3411_94_INC_H_
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <prtypes.h>
++
++struct GOSTR3411ContextStr;
++
++PRBool
++GostR3411_InitContextImp( struct GOSTR3411ContextStr *cx, void *param,
++    unsigned int paramLen );
++
++unsigned int
++GostR3411_FlattenSizeImp( struct GOSTR3411ContextStr *cx );
++
++void
++GostR3411_BeginImp( struct GOSTR3411ContextStr *cx );
++
++void
++GostR3411_ClearImp( struct GOSTR3411ContextStr *cx );
++
++void
++GostR3411_UpdateImp( struct GOSTR3411ContextStr *cx, const unsigned char *input,
++    unsigned int inputLen);
++
++void
++GostR3411_EndImp(struct GOSTR3411ContextStr *cx, unsigned char *digest,
++    unsigned int *digestLen, unsigned int maxDigestLen);
++
++#ifdef __cplusplus
++}
++#endif
++#endif /* GOSTR3411_94_INC_H_ */
+Index: security/nss/lib/freebl/gost3411i.c
+===================================================================
+RCS file: security/nss/lib/freebl/gost3411i.c
+diff -N security/nss/lib/freebl/gost3411i.c
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ security/nss/lib/freebl/gost3411i.c	24 Sep 2009 15:16:39 -0000
+@@ -0,0 +1,92 @@
++/* ***** BEGIN LICENSE BLOCK *****
++ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
++ *
++ * The contents of this file are subject to the Mozilla Public License Version
++ * 1.1 (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ * http://www.mozilla.org/MPL/
++ *
++ * Software distributed under the License is distributed on an "AS IS" basis,
++ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
++ * for the specific language governing rights and limitations under the
++ * License.
++ *
++ * The Initial Developer of the Original Code is Swemel JSC (http://swemel.ru)
++ * Portions created by the Initial Developer are Copyright (C) 2009
++ * the Initial Developer. All Rights Reserved.
++ *
++ * Contributor(s):
++ *   Konstantin Andreev <ka@nx.int.ru>, Swemel JSC (http://swemel.ru)
++ *
++ * Alternatively, the contents of this file may be used under the terms of
++ * either the GNU General Public License Version 2 or later (the "GPL"), or
++ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++ * in which case the provisions of the GPL or the LGPL are applicable instead
++ * of those above. If you wish to allow use of your version of this file only
++ * under the terms of either the GPL or the LGPL, and not to allow others to
++ * use your version of this file under the terms of the MPL, indicate your
++ * decision by deleting the provisions above and replace them with the notice
++ * and other provisions required by the GPL or the LGPL. If you do not delete
++ * the provisions above, a recipient may use your version of this file under
++ * the terms of any one of the MPL, the GPL or the LGPL.
++ *
++ * ***** END LICENSE BLOCK ***** */
++/* $Id$ */
++/* \file
++    blapi.h (freebl) interface to GOST R 34.11-94 hash function
++
++    Hash implementation need not any NSS staff => I discourage putting NSS
++headers in. But (by NSS convention) GOSTR3411_{NewContext,Begin,...} are
++declared in blapi{,t}.h.
++
++    To stop propagation of NSS headers to hash implementation, I call it via
++GostR3411_***_Imp() redirectors. They are defined in another compilation unit
++(gost3411.c), which doesn't depend from NSS.
++*/
++
++#include "blapi.h"      /* GOSTR3411_*** declarations here */
++#include "secerr.h"
++#include "gost3411.h"
++
++unsigned int
++GOSTR3411_FlattenSize(GOSTR3411Context *cx) {
++    return GostR3411_FlattenSizeImp( cx );
++}
++
++GOSTR3411Context *
++GOSTR3411_NewContext( const SECItem *param ) {
++    GOSTR3411Context *cx = PORT_Alloc(GOSTR3411_FlattenSize(NULL));
++    if( cx ) {
++        if( ! GostR3411_InitContextImp( cx, param->data, param->len ) ) {
++            PORT_Free( cx ); cx = NULL;
++            PORT_SetError(SEC_ERROR_INVALID_ARGS);
++        }
++    }
++    return cx;
++}
++
++void
++GOSTR3411_DestroyContext(GOSTR3411Context *cx, PRBool freeit) {
++    GostR3411_ClearImp( cx ); /* better than PORT_ZFree() */
++    if( freeit )
++        PORT_Free( cx );
++}
++
++void
++GOSTR3411_Begin(GOSTR3411Context *cx) {
++    GostR3411_BeginImp( cx );
++}
++
++void
++GOSTR3411_Update( GOSTR3411Context *cx, const unsigned char *input,
++			unsigned int inputLen)
++{
++    GostR3411_UpdateImp( cx, input, inputLen );
++}
++
++void
++GOSTR3411_End(GOSTR3411Context *cx, unsigned char *digest,
++		     unsigned int *digestLen, unsigned int maxDigestLen)
++{
++    GostR3411_EndImp( cx, digest, digestLen, maxDigestLen );
++}
+Index: security/nss/lib/freebl/hasht.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/hasht.h,v
+retrieving revision 1.7
+diff -u -p -r1.7 hasht.h
+--- security/nss/lib/freebl/hasht.h	10 Dec 2008 22:48:03 -0000	1.7
++++ security/nss/lib/freebl/hasht.h	24 Sep 2009 15:16:39 -0000
+@@ -54,6 +54,7 @@ typedef enum {
+     HASH_AlgSHA256 = 4,
+     HASH_AlgSHA384 = 5,
+     HASH_AlgSHA512 = 6,
++    HASH_AlgGostR3411 = 7,
+     HASH_AlgTOTAL
+ } HASH_HashType;
+ 
+@@ -73,7 +74,7 @@ typedef enum {
+  */
+ struct SECHashObjectStr {
+     unsigned int length;  /* hash output length (in bytes) */
+-    void * (*create)(void);
++    void * (*create)(const SECItem *param); /* GOST R 34.11-94 has param */
+     void * (*clone)(void *);
+     void (*destroy)(void *, PRBool);
+     void (*begin)(void *);
+Index: security/nss/lib/freebl/ldvector.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/ldvector.c,v
+retrieving revision 1.21
+diff -u -p -r1.21 ldvector.c
+--- security/nss/lib/freebl/ldvector.c	12 Feb 2009 22:48:43 -0000	1.21
++++ security/nss/lib/freebl/ldvector.c	24 Sep 2009 15:16:39 -0000
+@@ -261,9 +261,19 @@ static const struct FREEBLVectorStr vect
+     PRNGTEST_Instantiate,
+     PRNGTEST_Reseed,
+     PRNGTEST_Generate,
+-    PRNGTEST_Uninstantiate
++    PRNGTEST_Uninstantiate,
+ 
+     /* End of Version 3.013. */
++
++    GOSTR3411_NewContext,
++    GOSTR3411_DestroyContext,
++    GOSTR3411_Begin,
++    GOSTR3411_Update,
++    GOSTR3411_End,
++    GOSTR3411_FlattenSize,
++    GOST_R3410EL_VerifyDigest
++
++    /* End of Version 3.014. */
+ };
+ 
+ const FREEBLVector * 
+Index: security/nss/lib/freebl/loader.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/loader.c,v
+retrieving revision 1.44
+diff -u -p -r1.44 loader.c
+--- security/nss/lib/freebl/loader.c	29 Mar 2009 03:45:32 -0000	1.44
++++ security/nss/lib/freebl/loader.c	24 Sep 2009 15:16:39 -0000
+@@ -1696,4 +1696,63 @@ PRNGTEST_Uninstantiate()
+     return (vector->p_PRNGTEST_Uninstantiate)();
+ }
+ 
++/* ============== New for 3.014 =============================== */
+ 
++GOSTR3411Context *
++GOSTR3411_NewContext(const SECItem *param)
++{
++  if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
++      return NULL;
++  return (vector->p_GOSTR3411_NewContext)( param );
++}
++
++void
++GOSTR3411_DestroyContext(GOSTR3411Context *cx, PRBool freeit)
++{
++  if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
++      return ;
++  (vector->p_GOSTR3411_DestroyContext)(cx, freeit);
++}
++
++void
++GOSTR3411_Begin(GOSTR3411Context *cx)
++{
++  if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
++      return ;
++  (vector->p_GOSTR3411_Begin)(cx);
++}
++
++void
++GOSTR3411_Update(GOSTR3411Context *cx, const unsigned char *input,
++			unsigned int inputLen)
++{
++  if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
++      return ;
++  (vector->p_GOSTR3411_Update)(cx, input, inputLen);
++}
++
++void
++GOSTR3411_End(GOSTR3411Context *cx, unsigned char *digest,
++		     unsigned int *digestLen, unsigned int maxDigestLen)
++{
++  if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
++      return ;
++  (vector->p_GOSTR3411_End)(cx, digest, digestLen, maxDigestLen);
++}
++
++unsigned int
++GOSTR3411_FlattenSize(GOSTR3411Context *cx)
++{
++  if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
++      return 0;
++  return (vector->p_GOSTR3411_FlattenSize)(cx);
++}
++
++extern SECStatus
++GOST_R3410EL_VerifyDigest(const GOSTPublicKey *key, const SECItem *signature,
++    const SECItem *digest)
++{
++  if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
++      return SECFailure;
++  return (vector->p_GOST_R3410EL_VerifyDigest)( key, signature, digest );
++}
+Index: security/nss/lib/freebl/loader.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/loader.h,v
+retrieving revision 1.26
+diff -u -p -r1.26 loader.h
+--- security/nss/lib/freebl/loader.h	29 Mar 2009 03:45:32 -0000	1.26
++++ security/nss/lib/freebl/loader.h	24 Sep 2009 15:16:39 -0000
+@@ -44,7 +44,7 @@
+ 
+ #include "blapi.h"
+ 
+-#define FREEBL_VERSION 0x030B
++#define FREEBL_VERSION 0x030E
+ 
+ struct FREEBLVectorStr {
+ 
+@@ -539,7 +539,21 @@ struct FREEBLVectorStr {
+ 				   unsigned int additional_len);
+ 
+  SECStatus (* p_PRNGTEST_Uninstantiate)(void);
+-   /* Version 3.011 came to here */
++
++ /* End of Version 3.013. */
++ 
++ GOSTR3411Context * (* p_GOSTR3411_NewContext)(const SECItem *param);
++ void (* p_GOSTR3411_DestroyContext)(GOSTR3411Context *cx, PRBool freeit);
++ void (*p_GOSTR3411_Begin)(GOSTR3411Context *cx);
++ void (*p_GOSTR3411_Update)( GOSTR3411Context *cx, const unsigned char *input,
++    unsigned int inputLen);
++ void (*p_GOSTR3411_End)( GOSTR3411Context *cx, unsigned char *digest,
++    unsigned int *digestLen, unsigned int maxDigestLen);
++ unsigned int (*p_GOSTR3411_FlattenSize)(GOSTR3411Context *cx);
++ SECStatus (*p_GOST_R3410EL_VerifyDigest)( const GOSTPublicKey *key,
++    const SECItem *signature, const SECItem *digest);
++
++ /* End of Version 3.014. */
+ };
+ 
+ typedef struct FREEBLVectorStr FREEBLVector;
+Index: security/nss/lib/freebl/manifest.mn
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/manifest.mn,v
+retrieving revision 1.57
+diff -u -p -r1.57 manifest.mn
+--- security/nss/lib/freebl/manifest.mn	12 Feb 2009 22:48:44 -0000	1.57
++++ security/nss/lib/freebl/manifest.mn	24 Sep 2009 15:16:39 -0000
+@@ -134,6 +134,9 @@ CSRCS = \
+ 	md2.c \
+ 	md5.c \
+ 	sha512.c \
++	gost3411.c \
++	gost3411i.c \
++	gost28147.c \
+ 	alghmac.c \
+ 	rawhash.c \
+ 	alg2268.c \
+Index: security/nss/lib/freebl/rawhash.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/rawhash.c,v
+retrieving revision 1.5
+diff -u -p -r1.5 rawhash.c
+--- security/nss/lib/freebl/rawhash.c	18 Nov 2008 19:48:23 -0000	1.5
++++ security/nss/lib/freebl/rawhash.c	24 Sep 2009 15:16:40 -0000
+@@ -44,7 +44,7 @@
+ #include "secerr.h"
+ 
+ static void *
+-null_hash_new_context(void)
++null_hash_new_context(const SECItem *param)
+ {
+     return NULL;
+ }
+@@ -79,10 +79,27 @@ null_hash_destroy_context(void *v, PRBoo
+     PORT_Assert(v == NULL);
+ }
+ 
++static void *
++md2_NewContext(const SECItem *param) { return MD2_NewContext(); }
++
++static void *
++md5_NewContext(const SECItem *param) { return MD5_NewContext(); }
++
++static void *
++sha1_NewContext(const SECItem *param) { return SHA1_NewContext(); }
++
++static void *
++sha256_NewContext(const SECItem *param) { return SHA256_NewContext(); }
++
++static void *
++sha384_NewContext(const SECItem *param) { return SHA384_NewContext(); }
++
++static void *
++sha512_NewContext(const SECItem *param) { return SHA512_NewContext(); }
+ 
+ const SECHashObject SECRawHashObjects[] = {
+   { 0,
+-    (void * (*)(void)) null_hash_new_context,
++    null_hash_new_context,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) null_hash_destroy_context,
+     (void (*)(void *)) null_hash_begin,
+@@ -93,7 +110,7 @@ const SECHashObject SECRawHashObjects[] 
+     HASH_AlgNULL
+   },
+   { MD2_LENGTH,
+-    (void * (*)(void)) MD2_NewContext,
++    md2_NewContext,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) MD2_DestroyContext,
+     (void (*)(void *)) MD2_Begin,
+@@ -103,7 +120,7 @@ const SECHashObject SECRawHashObjects[] 
+     HASH_AlgMD2
+   },
+   { MD5_LENGTH,
+-    (void * (*)(void)) MD5_NewContext,
++    md5_NewContext,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) MD5_DestroyContext,
+     (void (*)(void *)) MD5_Begin,
+@@ -113,7 +130,7 @@ const SECHashObject SECRawHashObjects[] 
+     HASH_AlgMD5
+   },
+   { SHA1_LENGTH,
+-    (void * (*)(void)) SHA1_NewContext,
++    sha1_NewContext,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) SHA1_DestroyContext,
+     (void (*)(void *)) SHA1_Begin,
+@@ -123,7 +140,7 @@ const SECHashObject SECRawHashObjects[] 
+     HASH_AlgSHA1
+   },
+   { SHA256_LENGTH,
+-    (void * (*)(void)) SHA256_NewContext,
++    sha256_NewContext,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) SHA256_DestroyContext,
+     (void (*)(void *)) SHA256_Begin,
+@@ -134,7 +151,7 @@ const SECHashObject SECRawHashObjects[] 
+     HASH_AlgSHA256
+   },
+   { SHA384_LENGTH,
+-    (void * (*)(void)) SHA384_NewContext,
++    sha384_NewContext,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) SHA384_DestroyContext,
+     (void (*)(void *)) SHA384_Begin,
+@@ -145,7 +162,7 @@ const SECHashObject SECRawHashObjects[] 
+     HASH_AlgSHA384
+   },
+   { SHA512_LENGTH,
+-    (void * (*)(void)) SHA512_NewContext,
++    sha512_NewContext,
+     (void * (*)(void *)) null_hash_clone_context,
+     (void (*)(void *, PRBool)) SHA512_DestroyContext,
+     (void (*)(void *)) SHA512_Begin,
+@@ -155,6 +172,17 @@ const SECHashObject SECRawHashObjects[] 
+     SHA512_BLOCK_LENGTH,
+     HASH_AlgSHA512
+   },
++  { GOSTR3411_LENGTH,
++    (void * (*)(const SECItem *)) GOSTR3411_NewContext,
++    null_hash_clone_context,
++    (void (*)(void *, PRBool)) GOSTR3411_DestroyContext,
++    (void (*)(void *)) GOSTR3411_Begin,
++    (void (*)(void *, const unsigned char *, unsigned int )) GOSTR3411_Update,
++    (void (*)(void *, unsigned char *, unsigned int *,
++              unsigned int )) GOSTR3411_End,
++    GOSTR3411_BLOCK_LENGTH,
++    HASH_AlgGostR3411
++  }
+ };
+ 
+ const SECHashObject *
+Index: security/nss/lib/freebl/sechash.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/sechash.h,v
+retrieving revision 1.8
+diff -u -p -r1.8 sechash.h
+--- security/nss/lib/freebl/sechash.h	10 Dec 2008 22:48:04 -0000	1.8
++++ security/nss/lib/freebl/sechash.h	24 Sep 2009 15:16:40 -0000
+@@ -58,7 +58,17 @@ extern SECStatus     HASH_HashBuf(HASH_H
+ 				 unsigned char *src,
+ 				 PRUint32 src_len);
+ 
++/*! same as HASH_HashBuf, but with passing parameters to algorithm */
++extern SECStatus     HASH_HashBufParam(HASH_HashType type,
++				 unsigned char *dest,
++				 unsigned char *src,
++				 PRUint32 src_len,
++				 const SECItem *param
++);
++
+ extern HASHContext * HASH_Create(HASH_HashType type);
++/*! same as HASH_Create, but with passing parameters to algorithm */
++extern HASHContext * HASH_CreateParam(HASH_HashType type, const SECItem *param );
+ 
+ extern HASHContext * HASH_Clone(HASHContext *context);
+ 
+Index: security/nss/lib/freebl/ecl/ecl-curve.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/ecl/ecl-curve.h,v
+retrieving revision 1.6
+diff -u -p -r1.6 ecl-curve.h
+--- security/nss/lib/freebl/ecl/ecl-curve.h	25 Sep 2006 20:51:11 -0000	1.6
++++ security/nss/lib/freebl/ecl/ecl-curve.h	24 Sep 2009 15:16:40 -0000
+@@ -78,6 +78,17 @@ static const ECCurveParams ecCurve_NIST_
+ 	1
+ };
+ 
++static const ECCurveParams ecCurve_GOST_CP_A = { /* RFC4357 */
++	"CryptoPro A", ECField_GFp, 256,
++        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD97",
++        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD94",
++	"A6",
++	"0000000000000000000000000000000000000000000000000000000000000001",
++	"8D91E471E0989CDA27DF505A453F2B7635294F2DDF23E3B122ACC99C9E9F1E14",
++	"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF6C611070995AD10045841B09B761B893", 1
++};
++
++
+ /* mapping between ECCurveName enum and pointers to ECCurveParams */
+ static const ECCurveParams *ecCurve_map[] = {
+ 	NULL,			/* ECCurve_noName */
+@@ -138,6 +149,7 @@ static const ECCurveParams *ecCurve_map[
+ 	NULL,			/* ECCurve_WTLS_1 */
+ 	NULL,			/* ECCurve_WTLS_8 */
+ 	NULL,			/* ECCurve_WTLS_9 */
++	&ecCurve_GOST_CP_A, /* ECCurve_GOST_CP_A */
+ 	NULL			/* ECCurve_pastLastCurve */
+ };
+ 
+Index: security/nss/lib/freebl/ecl/ecl-exp.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/freebl/ecl/ecl-exp.h,v
+retrieving revision 1.2
+diff -u -p -r1.2 ecl-exp.h
+--- security/nss/lib/freebl/ecl/ecl-exp.h	25 Apr 2004 15:03:09 -0000	1.2
++++ security/nss/lib/freebl/ecl/ecl-exp.h	24 Sep 2009 15:16:40 -0000
+@@ -162,6 +162,9 @@ typedef enum {
+ 	/* ECCurve_WTLS_11 == ECCurve_NIST_B233 */
+ 	/* ECCurve_WTLS_12 == ECCurve_NIST_P224 */
+ 
++        /* CryptoPro curves */
++	ECCurve_GOST_CP_A,
++
+ 	ECCurve_pastLastCurve
+ } ECCurveName;
+ 
+Index: security/nss/lib/jar/jarsign.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/jar/jarsign.c,v
+retrieving revision 1.7
+diff -u -p -r1.7 jarsign.c
+--- security/nss/lib/jar/jarsign.c	28 Apr 2009 04:25:03 -0000	1.7
++++ security/nss/lib/jar/jarsign.c	24 Sep 2009 15:16:40 -0000
+@@ -219,7 +219,7 @@ jar_create_pk7(CERTCertDBHandle *certdb,
+     /* we sign with SHA */
+     hashObj = HASH_GetHashObject(HASH_AlgSHA1);
+ 
+-    hashcx = (* hashObj->create)();
++    hashcx = (* hashObj->create)(NULL);
+     if (hashcx == NULL)
+ 	return JAR_ERR_GENERAL;
+ 
+Index: security/nss/lib/nss/nss.def
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/nss/nss.def,v
+retrieving revision 1.202
+diff -u -p -r1.202 nss.def
+--- security/nss/lib/nss/nss.def	2 Sep 2009 16:50:37 -0000	1.202
++++ security/nss/lib/nss/nss.def	24 Sep 2009 15:16:41 -0000
+@@ -983,6 +983,10 @@ SECMOD_OpenNewSlot;
+ ;+    global:
+ SECMOD_GetDefaultModDBFlag;
+ SECMOD_GetSkipFirstFlag;
++PK11_CreateDigestContextParam;
++HASH_CreateParam;
++HASH_HashBufParam;
++SECITEM_CopyData;
+ ;+    local:
+ ;+       *;
+ ;+};
+Index: security/nss/lib/nss/utilwrap.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/nss/utilwrap.c,v
+retrieving revision 1.4
+diff -u -p -r1.4 utilwrap.c
+--- security/nss/lib/nss/utilwrap.c	16 Feb 2008 04:38:06 -0000	1.4
++++ security/nss/lib/nss/utilwrap.c	24 Sep 2009 15:16:41 -0000
+@@ -139,6 +139,7 @@
+ #undef SECITEM_ArenaDupItem
+ #undef SECITEM_CompareItem
+ #undef SECITEM_CopyItem
++#undef SECITEM_CopyData
+ #undef SECITEM_DupItem
+ #undef SECITEM_FreeItem
+ #undef SECITEM_ItemsAreEqual
+@@ -378,6 +379,12 @@ SECStatus SECITEM_CopyItem(PRArenaPool *
+     return SECITEM_CopyItem_Util(arena, to, from);
+ }
+ 
++SECStatus
++SECITEM_CopyData(PRArenaPool *arena, SECItem *to,
++    SECItemType type, const unsigned char *data, unsigned int len) {
++    return SECITEM_CopyData_Util( arena, to, type, data, len );
++}
++
+ SECItem *SECITEM_DupItem(const SECItem *from)
+ {
+     return SECITEM_DupItem_Util(from);
+Index: security/nss/lib/pk11wrap/pk11akey.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pk11wrap/pk11akey.c,v
+retrieving revision 1.27
+diff -u -p -r1.27 pk11akey.c
+--- security/nss/lib/pk11wrap/pk11akey.c	31 Mar 2009 23:49:06 -0000	1.27
++++ security/nss/lib/pk11wrap/pk11akey.c	24 Sep 2009 15:16:41 -0000
+@@ -83,7 +83,17 @@ pk11_MakeIDFromPublicKey(SECKEYPublicKey
+     PORT_Assert(pubKeyIndex != NULL);
+ 
+     return PK11_MakeIDFromPubKey(pubKeyIndex);
+-} 
++}
++
++static void
++pk11_secitm_setattr( CK_ATTRIBUTE **attr, CK_ATTRIBUTE_TYPE type,
++    const SECItem *t )
++{
++    if( t->len ) {
++        PK11_SETATTRS( *attr, type, t->data, t->len );
++        ++*attr;
++    }
++}
+ 
+ /*
+  * import a public key into the desired slot
+@@ -200,7 +210,6 @@ PK11_ImportPublicKey(PK11SlotInfo *slot,
+ 	    keyType = CKK_EC;
+ 	    PK11_SETATTRS(attrs, CKA_VERIFY, &cktrue, sizeof(CK_BBOOL));attrs++;
+ 	    PK11_SETATTRS(attrs, CKA_DERIVE, &cktrue, sizeof(CK_BBOOL));attrs++;
+- 	    signedattr = attrs;
+ 	    PK11_SETATTRS(attrs, CKA_EC_PARAMS, 
+ 		          pubKey->u.ec.DEREncodedParams.data,
+ 		          pubKey->u.ec.DEREncodedParams.len); attrs++;
+@@ -221,7 +230,23 @@ PK11_ImportPublicKey(PK11SlotInfo *slot,
+ 	    	PK11_SETATTRS(attrs, CKA_EC_POINT, 
+ 			  pubValue->data, pubValue->len); attrs++;
+ 	    }
++ 	    signedattr = attrs;
+ 	    break;
++        case gostKey:
++            keyType = CKK_GOSTR3410;
++            /* let PKCS#11 token assign defaults to: CKA_VERIFY, CKA_DERIVE,
++                    CKA_ENCRYPT, CKA_VERIFY_RECOVER, CKA_WRAP */
++            {
++                const SECKEYGOSTPublicKey *g = & pubKey->u.gost;
++                pk11_secitm_setattr( &attrs, CKA_VALUE, &g->value );
++                pk11_secitm_setattr( &attrs, CKA_GOSTR3410_PARAMS, &g->params );
++                pk11_secitm_setattr( &attrs, CKA_GOSTR3411_PARAMS,
++                        &g->digestParams);
++                pk11_secitm_setattr( &attrs, CKA_GOST28147_PARAMS,
++                        &g->encryptParams);
++            } /* copy key and params */
++ 	    signedattr = attrs;
++            break;
+ 	default:
+ 	    PORT_SetError( SEC_ERROR_BAD_KEY );
+ 	    return CK_INVALID_HANDLE;
+Index: security/nss/lib/pk11wrap/pk11cxt.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pk11wrap/pk11cxt.c,v
+retrieving revision 1.7
+diff -u -p -r1.7 pk11cxt.c
+--- security/nss/lib/pk11wrap/pk11cxt.c	4 Mar 2009 21:56:55 -0000	1.7
++++ security/nss/lib/pk11wrap/pk11cxt.c	24 Sep 2009 15:16:41 -0000
+@@ -242,7 +242,7 @@ pk11_context_init(PK11Context *context, 
+  */
+ static PK11Context *pk11_CreateNewContextInSlot(CK_MECHANISM_TYPE type,
+      PK11SlotInfo *slot, CK_ATTRIBUTE_TYPE operation, PK11SymKey *symKey,
+-							     SECItem *param)
++    const SECItem *param)
+ {
+     CK_MECHANISM mech_info;
+     PK11Context *context;
+@@ -297,23 +297,23 @@ static PK11Context *pk11_CreateNewContex
+     context->init = PR_FALSE;
+     context->sessionLock = PZ_NewLock(nssILockPK11cxt);
+     if ((context->param == NULL) || (context->sessionLock == NULL)) {
+-	PK11_DestroyContext(context,PR_TRUE);
+-	return NULL;
++        goto loser;
+     }
+ 
+     mech_info.mechanism = type;
+-    mech_info.pParameter = param->data;
+-    mech_info.ulParameterLen = param->len;
++    mech_info.pParameter = context->param->data;
++    mech_info.ulParameterLen = context->param->len;
+     PK11_EnterContextMonitor(context);
+     rv = pk11_context_init(context,&mech_info);
+     PK11_ExitContextMonitor(context);
+ 
+-    if (rv != SECSuccess) {
+-	PK11_DestroyContext(context,PR_TRUE);
+-	return NULL;
+-    }
++    if (rv != SECSuccess) goto loser;
++
+     context->init = PR_TRUE;
+     return context;
++loser:
++    PK11_DestroyContext(context,PR_TRUE);
++    return NULL;
+ }
+ 
+ 
+@@ -399,13 +399,17 @@ PK11_CreateContextBySymKey(CK_MECHANISM_
+  * Macing should use PK11_CreateContextBySymKey.
+  */
+ PK11Context *
+-PK11_CreateDigestContext(SECOidTag hashAlg)
++PK11_CreateDigestContext( SECOidTag hashAlg ) {
++    return PK11_CreateDigestContextParam( hashAlg, NULL );
++}
++
++PK11Context *
++PK11_CreateDigestContextParam( SECOidTag hashAlg, const SECItem *param )
+ {
+     /* digesting has to work without authentication to the slot */
+     CK_MECHANISM_TYPE type;
+     PK11SlotInfo *slot;
+     PK11Context *context;
+-    SECItem param;
+ 
+     type = PK11_AlgtagToMechanism(hashAlg);
+     slot = PK11_GetBestSlot(type, NULL);
+@@ -413,13 +417,10 @@ PK11_CreateDigestContext(SECOidTag hashA
+ 	PORT_SetError( SEC_ERROR_NO_MODULE );
+ 	return NULL;
+     }
+-
+-    /* maybe should really be PK11_GenerateNewParam?? */
+-    param.data = NULL;
+-    param.len = 0;
+-    param.type = 0;
+-
+-    context = pk11_CreateNewContextInSlot(type, slot, CKA_DIGEST, NULL, &param);
++    /* pk11_CreateNewContextInSlot does not like NULL param, so replacing NULL
++     with blank param. */
++    context = pk11_CreateNewContextInSlot(type, slot, CKA_DIGEST, NULL, 
++        param ? param : &pk11_null_params );
+     PK11_FreeSlot(slot);
+     return context;
+ }
+Index: security/nss/lib/pk11wrap/pk11load.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pk11wrap/pk11load.c,v
+retrieving revision 1.25
+diff -u -p -r1.25 pk11load.c
+--- security/nss/lib/pk11wrap/pk11load.c	2 Oct 2008 00:56:15 -0000	1.25
++++ security/nss/lib/pk11wrap/pk11load.c	24 Sep 2009 15:16:41 -0000
+@@ -294,7 +294,7 @@ SECMOD_LoadPKCS11Module(SECMODModule *mo
+         return SECFailure;
+ 
+     if (mod->isModuleDB) {
+-        mod->moduleDBFunc = (CK_C_GetFunctionList) 
++        mod->moduleDBFunc = /* (CK_C_GetFunctionList) - moduleDBFunc is (void*) */
+                     PR_FindSymbol(softokenLib, "NSC_ModuleDBFunc");
+     }
+ 
+Index: security/nss/lib/pk11wrap/pk11mech.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pk11wrap/pk11mech.c,v
+retrieving revision 1.13
+diff -u -p -r1.13 pk11mech.c
+--- security/nss/lib/pk11wrap/pk11mech.c	17 Dec 2008 06:09:15 -0000	1.13
++++ security/nss/lib/pk11wrap/pk11mech.c	24 Sep 2009 15:16:41 -0000
+@@ -1863,6 +1863,8 @@ PK11_MapSignKeyType(KeyType keyType)
+ 	return CKM_DSA;
+     case ecKey:
+ 	return CKM_ECDSA;
++    case gostKey:
++        return CKM_GOSTR3410;
+     case dhKey:
+     default:
+ 	break;
+Index: security/nss/lib/pk11wrap/pk11pbe.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pk11wrap/pk11pbe.c,v
+retrieving revision 1.23
+diff -u -p -r1.23 pk11pbe.c
+--- security/nss/lib/pk11wrap/pk11pbe.c	31 Mar 2009 21:03:49 -0000	1.23
++++ security/nss/lib/pk11wrap/pk11pbe.c	24 Sep 2009 15:16:41 -0000
+@@ -1350,7 +1350,7 @@ PK11_PBEKeyGen(PK11SlotInfo *slot, SECAl
+     SECItem *param = NULL;
+     PK11SymKey *symKey;
+     SECOidTag	pbeAlg;
+-    CK_KEY_TYPE keyType = -1;
++    CK_KEY_TYPE keyType = (CK_KEY_TYPE)(-1);
+     int keyLen = 0;
+ 
+     pbeAlg = SECOID_GetAlgorithmTag(algid);
+Index: security/nss/lib/pk11wrap/pk11pub.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pk11wrap/pk11pub.h,v
+retrieving revision 1.31
+diff -u -p -r1.31 pk11pub.h
+--- security/nss/lib/pk11wrap/pk11pub.h	19 Sep 2009 00:02:59 -0000	1.31
++++ security/nss/lib/pk11wrap/pk11pub.h	24 Sep 2009 15:16:42 -0000
+@@ -676,6 +676,9 @@ void PK11_DestroyContext(PK11Context *co
+ PK11Context *PK11_CreateContextBySymKey(CK_MECHANISM_TYPE type,
+ 	CK_ATTRIBUTE_TYPE operation, PK11SymKey *symKey, SECItem *param);
+ PK11Context *PK11_CreateDigestContext(SECOidTag hashAlg);
++/*! same as PK11_CreateDigestContext, but with passing parameters to algorithm
++ \param param - it's ok to pass NULL here. */
++PK11Context *PK11_CreateDigestContextParam(SECOidTag hashAlg, const SECItem *param );
+ PK11Context *PK11_CloneContext(PK11Context *old);
+ SECStatus PK11_DigestBegin(PK11Context *cx);
+ /*
+Index: security/nss/lib/pk11wrap/pk11slot.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pk11wrap/pk11slot.c,v
+retrieving revision 1.99
+diff -u -p -r1.99 pk11slot.c
+--- security/nss/lib/pk11wrap/pk11slot.c	30 Jul 2009 00:37:29 -0000	1.99
++++ security/nss/lib/pk11wrap/pk11slot.c	24 Sep 2009 15:16:42 -0000
+@@ -1947,6 +1947,7 @@ PK11_GetBestSlotMultiple(CK_MECHANISM_TY
+ 	    (type[i] != CKM_SHA256) &&
+ 	    (type[i] != CKM_SHA384) &&
+ 	    (type[i] != CKM_SHA512) &&
++	    (type[i] != CKM_GOSTR3411) &&
+ 	    (type[i] != CKM_MD5) && 
+ 	    (type[i] != CKM_MD2)) {
+ 	    listNeedLogin = PR_TRUE;
+Index: security/nss/lib/pkcs7/p7decode.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pkcs7/p7decode.c,v
+retrieving revision 1.25
+diff -u -p -r1.25 p7decode.c
+--- security/nss/lib/pkcs7/p7decode.c	10 Mar 2008 00:01:26 -0000	1.25
++++ security/nss/lib/pkcs7/p7decode.c	24 Sep 2009 15:16:42 -0000
+@@ -318,7 +318,7 @@ sec_pkcs7_decoder_start_digests (SEC_PKC
+ 	    continue;
+ 	}
+ 
+-	digcx = (* digobj->create)();
++	digcx = (* digobj->create)(NULL);
+ 	if (digcx != NULL) {
+ 	    (* digobj->begin) (digcx);
+ 	    p7dcx->worker.digobjs[p7dcx->worker.digcnt] = digobj;
+Index: security/nss/lib/pkcs7/p7encode.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/pkcs7/p7encode.c,v
+retrieving revision 1.13
+diff -u -p -r1.13 p7encode.c
+--- security/nss/lib/pkcs7/p7encode.c	10 Mar 2008 00:01:26 -0000	1.13
++++ security/nss/lib/pkcs7/p7encode.c	24 Sep 2009 15:16:42 -0000
+@@ -595,7 +595,7 @@ sec_pkcs7_encoder_start_contexts (SEC_PK
+ 
+ 	p7ecx->digestobj = HASH_GetHashObjectByOidTag(oidTag);
+ 	if (p7ecx->digestobj != NULL) {
+-	    p7ecx->digestcx = (* p7ecx->digestobj->create) ();
++	    p7ecx->digestcx = (* p7ecx->digestobj->create) (NULL);
+ 	    if (p7ecx->digestcx == NULL)
+ 		p7ecx->digestobj = NULL;
+ 	    else
+Index: security/nss/lib/smime/cmsdigest.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/smime/cmsdigest.c,v
+retrieving revision 1.8
+diff -u -p -r1.8 cmsdigest.c
+--- security/nss/lib/smime/cmsdigest.c	25 Apr 2004 15:03:16 -0000	1.8
++++ security/nss/lib/smime/cmsdigest.c	24 Sep 2009 15:16:42 -0000
+@@ -126,7 +126,7 @@ NSS_CMSDigestContext_StartMultiple(SECAl
+ 	if (digobj == NULL)
+ 	    continue;
+ 
+-	digcx = (*digobj->create)();
++	digcx = (*digobj->create)(NULL);
+ 	if (digcx != NULL) {
+ 	    (*digobj->begin) (digcx);
+ 	    cmsdigcx->digPairs[i].digobj = digobj;
+Index: security/nss/lib/softoken/ecdecode.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/softoken/ecdecode.c,v
+retrieving revision 1.8
+diff -u -p -r1.8 ecdecode.c
+--- security/nss/lib/softoken/ecdecode.c	19 Jul 2006 00:14:31 -0000	1.8
++++ security/nss/lib/softoken/ecdecode.c	24 Sep 2009 15:16:42 -0000
+@@ -200,6 +200,7 @@ EC_FillParams(PRArenaPool *arena, const 
+ #endif
+ 
+     if ((encodedParams->len != ANSI_X962_CURVE_OID_TOTAL_LEN) &&
++	(encodedParams->len != CRYPTOPRO_CURVE_OID_TOTAL_LEN) &&
+ 	(encodedParams->len != SECG_CURVE_OID_TOTAL_LEN)) {
+ 	    PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+ 	    return SECFailure;
+@@ -208,6 +209,7 @@ EC_FillParams(PRArenaPool *arena, const 
+     oid.len = encodedParams->len - 2;
+     oid.data = encodedParams->data + 2;
+     if ((encodedParams->data[0] != SEC_ASN1_OBJECT_ID) ||
++        (encodedParams->data[1] != oid.len) ||
+ 	((tag = SECOID_FindOIDTag(&oid)) == SEC_OID_UNKNOWN)) { 
+ 	    PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+ 	    return SECFailure;
+@@ -588,6 +590,10 @@ EC_FillParams(PRArenaPool *arena, const 
+ 	    params) );
+ 	break;
+ 
++    case SEC_OID_CP_GOST_R3410EL_EC_A:
++	CHECK_SEC_OK( gf_populate_params(ECCurve_GOST_CP_A, ec_field_GFp,
++	    params) );
++	break;
+     default:
+ 	break;
+     };
+Index: security/nss/lib/softoken/lowkeyti.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/softoken/lowkeyti.h,v
+retrieving revision 1.8
+diff -u -p -r1.8 lowkeyti.h
+--- security/nss/lib/softoken/lowkeyti.h	13 Jun 2007 00:24:56 -0000	1.8
++++ security/nss/lib/softoken/lowkeyti.h	24 Sep 2009 15:16:42 -0000
+@@ -89,7 +89,8 @@ typedef enum { 
+     NSSLOWKEYRSAKey = 1, 
+     NSSLOWKEYDSAKey = 2, 
+     NSSLOWKEYDHKey = 4,
+-    NSSLOWKEYECKey = 5
++    NSSLOWKEYECKey = 5,
++    NSSLOWKEYGOSTKey = 6
+ } NSSLOWKEYType;
+ 
+ /*
+@@ -103,6 +104,7 @@ struct NSSLOWKEYPublicKeyStr {
+ 	DSAPublicKey dsa;
+ 	DHPublicKey  dh;
+ 	ECPublicKey  ec;
++	GOSTPublicKey gost;
+     } u;
+ };
+ typedef struct NSSLOWKEYPublicKeyStr NSSLOWKEYPublicKey;
+Index: security/nss/lib/softoken/lowpbe.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/softoken/lowpbe.c,v
+retrieving revision 1.21
+diff -u -p -r1.21 lowpbe.c
+--- security/nss/lib/softoken/lowpbe.c	21 Dec 2007 01:30:02 -0000	1.21
++++ security/nss/lib/softoken/lowpbe.c	24 Sep 2009 15:16:42 -0000
+@@ -122,7 +122,7 @@ nsspkcs5_HashBuf(const SECHashObject *ha
+     void *ctx;
+     unsigned int retLen;
+ 
+-    ctx = hashObj->create();
++    ctx = hashObj->create( NULL );
+     if(ctx == NULL) {
+ 	return SECFailure;
+     }
+@@ -520,7 +520,7 @@ nsspkcs5_PKCS12PBE(const SECHashObject *
+ 	goto loser;
+     }
+ 
+-    hash = hashObject->create();
++    hash = hashObject->create( NULL );
+     if(!hash) {
+ 	goto loser;
+     }
+Index: security/nss/lib/softoken/pkcs11.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/softoken/pkcs11.c,v
+retrieving revision 1.167
+diff -u -p -r1.167 pkcs11.c
+--- security/nss/lib/softoken/pkcs11.c	5 Jun 2009 03:17:58 -0000	1.167
++++ security/nss/lib/softoken/pkcs11.c	24 Sep 2009 15:16:42 -0000
+@@ -333,7 +333,8 @@ static const struct mechanismList mechan
+      {CKM_EC_KEY_PAIR_GEN,      {112, 571, CKF_GENERATE_KEY_PAIR|CKF_EC_BPNU}, PR_TRUE}, 
+      {CKM_ECDH1_DERIVE,         {112, 571, CKF_DERIVE|CKF_EC_BPNU}, PR_TRUE}, 
+      {CKM_ECDSA,                {112, 571, CKF_SN_VR|CKF_EC_BPNU}, PR_TRUE}, 
+-     {CKM_ECDSA_SHA1,           {112, 571, CKF_SN_VR|CKF_EC_BPNU}, PR_TRUE}, 
++     {CKM_ECDSA_SHA1,           {112, 571, CKF_SN_VR|CKF_EC_BPNU}, PR_TRUE},
++     {CKM_GOSTR3410,            {256, 256, CKF_SN_VR}, PR_TRUE},
+ #endif /* NSS_ENABLE_ECC */
+      /* ------------------------- RC2 Operations --------------------------- */
+      {CKM_RC2_KEY_GEN,		{1, 128, CKF_GENERATE},		PR_TRUE},
+@@ -407,6 +408,7 @@ static const struct mechanismList mechan
+      {CKM_SHA512_HMAC,		{1, 128, CKF_SN_VR},		PR_TRUE},
+      {CKM_SHA512_HMAC_GENERAL,	{1, 128, CKF_SN_VR},		PR_TRUE},
+      {CKM_TLS_PRF_GENERAL,	{0, 512, CKF_SN_VR},		PR_FALSE},
++     {CKM_GOSTR3411,		{0,   0, CKF_DIGEST},		PR_FALSE},
+      /* ------------------------- CAST Operations --------------------------- */
+ #ifdef NSS_SOFTOKEN_DOES_CAST
+      /* Cast operations are not supported ( yet? ) */
+@@ -924,6 +926,17 @@ sftk_handlePublicKeyObject(SFTKSession *
+ 	recover = CK_FALSE;
+ 	wrap = CK_FALSE;
+ 	break;
++    case CKK_GOSTR3410:
++        /* ECC attributes values will be chkd later in sftk_GetPubKey */
++        if( !(
++            sftk_hasAttribute(object, CKA_VALUE )  &&
++            sftk_hasAttribute(object, CKA_GOSTR3410_PARAMS )
++            /* CKA_GOSTR3411_PARAMS and CKA_GOST28147_PARAMS are optional */
++        ))
++            return CKR_TEMPLATE_INCOMPLETE;
++        /* XXX: TODO: copy-pasted from CKK_EC. Is it what I want ? */
++        verify = derive = CK_TRUE; wrap = recover = encrypt = CK_FALSE;
++        break;
+ #endif /* NSS_ENABLE_ECC */
+     default:
+ 	return CKR_ATTRIBUTE_VALUE_INVALID;
+@@ -1538,6 +1551,19 @@ sftk_handleObject(SFTKObject *object, SF
+     return CKR_OK;
+ }
+ 
++/*! copy nbytes of data from src to dst in reverse order.
++    \return dst
++ */
++static void *
++memrevcpy( void *dst, const void *src, unsigned int nbytes ) {
++    if(  src && dst  ) {
++        unsigned char *d = (unsigned char *)dst + nbytes;
++        const unsigned char *s = src;
++        for(; nbytes; --nbytes )
++            *--d = *s++;
++    }
++    return dst;
++}
+ /*
+  * ******************** Public Key Utilities ***************************
+  */
+@@ -1637,7 +1663,7 @@ NSSLOWKEYPublicKey *sftk_GetPubKey(SFTKO
+ 	if (crv == CKR_OK) {
+ 	    int keyLen,curveLen;
+ 
+-	    curveLen = (pubKey->u.ec.ecParams.fieldID.size +7)/8;
++	    curveLen = BITLEN_TO_OCTETLEN( pubKey->u.ec.ecParams.fieldID.size );
+ 	    keyLen = (2*curveLen)+1;
+ 
+ 	    /* special note: We can't just use the first byte to determine
+@@ -1675,6 +1701,53 @@ NSSLOWKEYPublicKey *sftk_GetPubKey(SFTKO
+ 	   crv = CKR_ATTRIBUTE_VALUE_INVALID;
+ 	}
+ 	break;
++    case CKK_GOSTR3410:
++    {   /* -- populate pub.key value --
++         */
++        unsigned int len;
++        SFTKAttribute *attr = sftk_FindAttribute(object, CKA_VALUE );
++        if ( attr == NULL ) {
++            crv = CKR_TEMPLATE_INCOMPLETE; break;
++        }
++        /* convert PKCS#11 value to ECPoint */
++        len = attr->attrib.ulValueLen;
++        if( 0 != (len & 1) ) /* must be even */
++            crv = CKR_ATTRIBUTE_VALUE_INVALID;
++        else {
++            SECItem *t = &pubKey->u.gost.value;
++            t->data = NULL;
++            if( NULL == SECITEM_AllocItem( arena, t, len + 1 )) /* +1: lead 04*/
++                crv = CKR_HOST_MEMORY;
++            else {
++                len >>= 1; /* lenght of x and y components of pub.key */
++                t->data[0] = 0x04;
++                /* CKA_VALUE: little-endian (x,y), ecpoint - big-endian ones */
++                memrevcpy( & t->data[1],       attr->attrib.pValue,       len );
++                memrevcpy( & t->data[1 + len],
++                        (const unsigned char *)attr->attrib.pValue + len, len );
++            } // pub.key value alloc
++        } // even value len
++        sftk_FreeAttribute(attr);
++
++        /* -- populate ecParams --
++         */
++        attr = sftk_FindAttribute(object, CKA_GOSTR3410_PARAMS );
++        if ( attr == NULL ) {
++            crv = CKR_TEMPLATE_INCOMPLETE; break;
++        }
++        {
++          SECItem t ={siBuffer, attr->attrib.pValue, attr->attrib.ulValueLen};
++          if(EC_FillParams(arena, &t, &pubKey->u.gost.ecParams) != SECSuccess)
++              crv = CKR_DOMAIN_PARAMS_INVALID;
++        }
++        sftk_FreeAttribute(attr);
++        pubKey->keyType = NSSLOWKEYGOSTKey;
++        /* I need not DEREncoding field, but ec_points_mul tries to print
++            DEREncoding and segfaults if it contains garbage */
++        pubKey->u.gost.ecParams.DEREncoding.len = 0;
++        crv = CKR_OK;
++    }
++        break;
+ #endif /* NSS_ENABLE_ECC */
+     default:
+ 	crv = CKR_KEY_TYPE_INCONSISTENT;
+Index: security/nss/lib/softoken/pkcs11c.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/softoken/pkcs11c.c,v
+retrieving revision 1.111
+diff -u -p -r1.111 pkcs11c.c
+--- security/nss/lib/softoken/pkcs11c.c	31 Mar 2009 22:39:57 -0000	1.111
++++ security/nss/lib/softoken/pkcs11c.c	24 Sep 2009 15:16:43 -0000
+@@ -1276,9 +1276,14 @@ CK_RV NSC_DigestInit(CK_SESSION_HANDLE h
+     SFTKSession *session;
+     SFTKSessionContext *context;
+     CK_RV crv = CKR_OK;
++    SECItem param;
+ 
+     CHECK_FORK();
+ 
++    /* MD*, SHA* hashes must have no parameters. */
++    if((pMechanism->mechanism != CKM_GOSTR3411) && pMechanism->ulParameterLen )
++        return CKR_ARGUMENTS_BAD;
++
+     session = sftk_SessionFromHandle(hSession);
+     if (session == NULL) 
+     	return CKR_SESSION_HANDLE_INVALID;
+@@ -1288,36 +1293,41 @@ CK_RV NSC_DigestInit(CK_SESSION_HANDLE h
+ 	return crv;
+     }
+ 
+-
+-#define INIT_MECH(mech,mmm) \
++#define INIT_MECH(mech,mmm,par) \
+     case mech: { \
+-	mmm ## Context * mmm ## _ctx = mmm ## _NewContext(); \
+-	context->cipherInfo    = (void *)mmm ## _ctx; \
+-	context->cipherInfoLen = mmm ## _FlattenSize(mmm ## _ctx); \
+-	context->currentMech   = mech; \
+-	context->hashUpdate    = (SFTKHash)    mmm ## _Update; \
+-	context->end           = (SFTKEnd)     mmm ## _End; \
+-	context->destroy       = (SFTKDestroy) mmm ## _DestroyContext; \
+-	context->maxLen        = mmm ## _LENGTH; \
+-        if (mmm ## _ctx) \
++        mmm ## Context * mmm ## _ctx = mmm ## _NewContext( par ); \
++        if( NULL != (context->cipherInfo = (void *)mmm ## _ctx)) { \
++            context->cipherInfoLen = mmm ## _FlattenSize(mmm ## _ctx); \
++            context->hashUpdate    = (SFTKHash)    mmm ## _Update; \
++            context->end           = (SFTKEnd)     mmm ## _End; \
++            context->destroy       = (SFTKDestroy) mmm ## _DestroyContext; \
++            context->maxLen        = mmm ## _LENGTH; \
+ 	    mmm ## _Begin(mmm ## _ctx); \
+-	else  \
+-	    crv = CKR_HOST_MEMORY; \
++        } \
+ 	break; \
+     }
+ 
+-    switch(pMechanism->mechanism) {
+-    INIT_MECH(CKM_MD2,    MD2)
+-    INIT_MECH(CKM_MD5,    MD5)
+-    INIT_MECH(CKM_SHA_1,  SHA1)
+-    INIT_MECH(CKM_SHA256, SHA256)
+-    INIT_MECH(CKM_SHA384, SHA384)
+-    INIT_MECH(CKM_SHA512, SHA512)
++    param.data = pMechanism->pParameter;
++    param.len  = pMechanism->ulParameterLen;
++    context->currentMech = pMechanism->mechanism;
+ 
++    switch(pMechanism->mechanism) {
++    INIT_MECH(CKM_MD2,          MD2,        /**/ )
++    INIT_MECH(CKM_MD5,          MD5,        /**/ )
++    INIT_MECH(CKM_SHA_1,        SHA1,       /**/ )
++    INIT_MECH(CKM_SHA256,       SHA256,     /**/ )
++    INIT_MECH(CKM_SHA384,       SHA384,     /**/ )
++    INIT_MECH(CKM_SHA512,       SHA512,     /**/ )
++    INIT_MECH(CKM_GOSTR3411,    GOSTR3411,  &param )
+     default:
+ 	crv = CKR_MECHANISM_INVALID;
+ 	break;
+     }
++    /* Before GOSTR3411 #hash#_NewContext() fails only with SEC_ERROR_NO_MEMORY.
++       GOSTR3411 has added SEC_ERROR_INVALID_ARG. Let generalize handling.
++     */
++    if( crv == CKR_OK  &&  NULL == context->cipherInfo )
++        crv = sftk_MapCryptError(PORT_GetError());
+ 
+     if (crv != CKR_OK) {
+         sftk_FreeContext(context);
+@@ -1347,22 +1357,30 @@ CK_RV NSC_Digest(CK_SESSION_HANDLE hSess
+     crv = sftk_GetContext(hSession,&context,SFTK_HASH,PR_FALSE,&session);
+     if (crv != CKR_OK) return crv;
+ 
+-    if (pDigest == NULL) {
+-	*pulDigestLen = context->maxLen;
+-	goto finish;
++    /*  PKCS#11 v2.20,
++            sect.11.2  "... returning output in a variable-length buffer"
++            sect.11.10 "Message digesting functions", C_Digest
++     */
++    digestLen = context->maxLen; /* NSC_DigestInit saved hash length here */
++
++    if( pDigest == NULL  ||  maxout < digestLen ) {
++        if( pDigest ) crv = CKR_BUFFER_TOO_SMALL;
++    } else {
++        /* do it: */
++        (*context->hashUpdate)(context->cipherInfo, pData, ulDataLen);
++        /*  NOTE: this assumes buf size is bigenough for the algorithm */
++        (*context->end)(context->cipherInfo, pDigest, &digestLen,maxout);
++        /* GOSTR3411 can signal bad context by setting digestLen to zero */
++        if( digestLen == 0 )
++            crv = CKR_ARGUMENTS_BAD;
++
++        sftk_SetContextByType(session, SFTK_HASH, NULL);
++        sftk_FreeContext(context);
+     }
+ 
+-    /* do it: */
+-    (*context->hashUpdate)(context->cipherInfo, pData, ulDataLen);
+-    /*  NOTE: this assumes buf size is bigenough for the algorithm */
+-    (*context->end)(context->cipherInfo, pDigest, &digestLen,maxout);
+     *pulDigestLen = digestLen;
+-
+-    sftk_SetContextByType(session, SFTK_HASH, NULL);
+-    sftk_FreeContext(context);
+-finish:
+     sftk_FreeSession(session);
+-    return CKR_OK;
++    return crv;
+ }
+ 
+ 
+@@ -1400,17 +1418,27 @@ CK_RV NSC_DigestFinal(CK_SESSION_HANDLE 
+     crv = sftk_GetContext(hSession, &context, SFTK_HASH, PR_TRUE, &session);
+     if (crv != CKR_OK) return crv;
+ 
+-    if (pDigest != NULL) {
++    /*  PKCS#11 v2.20, 
++            sect.11.2  "... returning output in a variable-length buffer"
++            sect.11.10 "Message digesting functions", C_DigestFinal
++     */
++    digestLen = context->maxLen; /* NSC_DigestInit saved hash length here */
++
++    if( pDigest == NULL  ||  maxout < digestLen ) {
++        if( pDigest ) crv = CKR_BUFFER_TOO_SMALL;
++    } else {
+         (*context->end)(context->cipherInfo, pDigest, &digestLen, maxout);
+-        *pulDigestLen = digestLen;
++        /* GOSTR3411 can signal bad context by setting digestLen to zero */
++        if( digestLen == 0 )
++            crv = CKR_ARGUMENTS_BAD;
++
+ 	sftk_SetContextByType(session, SFTK_HASH, NULL);
+ 	sftk_FreeContext(context);
+-    } else {
+-	*pulDigestLen = context->maxLen;
+     }
+ 
++    *pulDigestLen = digestLen;
+     sftk_FreeSession(session);
+-    return CKR_OK;
++    return crv;
+ }
+ 
+ /*
+@@ -1919,6 +1947,17 @@ nsc_ECDSASignStub(void *ctx, void *sigBu
+     *sigLen = signature.len;
+     return rv;
+ }
++
++static SECStatus
++nsc_GOSTR3410ELVerifyStub(void *ctx, void *sigBuf, unsigned int sigLen,
++                    void *dataBuf, unsigned int dataLen)
++{
++    SECItem signature = { siBuffer,  sigBuf,  sigLen },
++            digest    = { siBuffer, dataBuf, dataLen };
++    return GOST_R3410EL_VerifyDigest( & ((NSSLOWKEYPublicKey *)ctx)->u.gost,
++        &signature, &digest );
++}
++
+ #endif /* NSS_ENABLE_ECC */
+ 
+ /* NSC_SignInit setups up the signing operations. There are three basic
+@@ -2503,14 +2542,22 @@ finish_rsa:
+ 	    break;
+ 	}
+ 	pubKey = sftk_GetPubKey(key,CKK_EC,&crv);
+-	if (pubKey == NULL) {
+-	    crv = CKR_HOST_MEMORY;
++        if (crv != CKR_OK) break;
++	context->cipherInfo = pubKey;
++	context->verify     = nsc_ECDSAVerifyStub;
++	context->destroy    = sftk_Null;
++	break;
++    case CKM_GOSTR3410:
++	if( key_type != CKK_GOSTR3410 ) {
++	    crv = CKR_KEY_TYPE_INCONSISTENT;
+ 	    break;
+ 	}
++	pubKey = sftk_GetPubKey(key, CKK_GOSTR3410, &crv);
++        if (crv != CKR_OK) break;
+ 	context->cipherInfo = pubKey;
+-	context->verify     = (SFTKVerify) nsc_ECDSAVerifyStub;
++	context->verify     = nsc_GOSTR3410ELVerifyStub;
+ 	context->destroy    = sftk_Null;
+-	break;
++        break;
+ #endif /* NSS_ENABLE_ECC */
+ 
+     INIT_HMAC_MECH(MD2)
+Index: security/nss/lib/softoken/pkcs11u.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/softoken/pkcs11u.c,v
+retrieving revision 1.82
+diff -u -p -r1.82 pkcs11u.c
+--- security/nss/lib/softoken/pkcs11u.c	11 Jun 2009 06:28:06 -0000	1.82
++++ security/nss/lib/softoken/pkcs11u.c	24 Sep 2009 15:16:43 -0000
+@@ -101,7 +101,7 @@ sftk_NewAttribute(SFTKObject *object,
+ 	attribute->attrib.pValue = NULL;
+ 	attribute->attrib.ulValueLen = 0;
+     }
+-    attribute->attrib.type = type;
++
+     attribute->handle = type;
+     attribute->next = attribute->prev = NULL;
+     return attribute;
+Index: security/nss/lib/ssl/sslcon.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/ssl/sslcon.c,v
+retrieving revision 1.36
+diff -u -p -r1.36 sslcon.c
+--- security/nss/lib/ssl/sslcon.c	4 Mar 2009 21:57:18 -0000	1.36
++++ security/nss/lib/ssl/sslcon.c	24 Sep 2009 15:16:43 -0000
+@@ -478,7 +478,7 @@ ssl2_CreateMAC(sslSecurityInfo *sec, SEC
+ 	PORT_SetError(SSL_ERROR_NO_CYPHER_OVERLAP);
+ 	return SECFailure;
+     }
+-    sec->hashcx = (*sec->hash->create)();
++    sec->hashcx = (*sec->hash->create)( NULL );
+     if (sec->hashcx == NULL)
+ 	return SECFailure;
+     return SECSuccess;
+Index: security/nss/lib/util/nssutil.def
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/nssutil.def,v
+retrieving revision 1.9
+diff -u -p -r1.9 nssutil.def
+--- security/nss/lib/util/nssutil.def	13 Mar 2009 02:59:02 -0000	1.9
++++ security/nss/lib/util/nssutil.def	24 Sep 2009 15:16:44 -0000
+@@ -241,3 +241,9 @@ UTIL_SetForkState;
+ ;+    local:
+ ;+       *;
+ ;+};
++;+NSSUTIL_3.12.5 { 	# NSS Utilities 3.12.4 release
++;+    global:
++SECITEM_CopyData_Util;
++;+    local:
++;+       *;
++;+};
+Index: security/nss/lib/util/pkcs11t.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/pkcs11t.h,v
+retrieving revision 1.20
+diff -u -p -r1.20 pkcs11t.h
+--- security/nss/lib/util/pkcs11t.h	25 Mar 2009 05:21:03 -0000	1.20
++++ security/nss/lib/util/pkcs11t.h	24 Sep 2009 15:16:44 -0000
+@@ -431,6 +431,11 @@ typedef CK_ULONG          CK_KEY_TYPE;
+ 
+ #define CKK_SEED	    0x00000026
+ 
++/* Russian GOST standards. PKCS#11 v2.30: Mechanisms. */
++#define CKK_GOSTR3410       0x00000030
++#define CKK_GOSTR3411       0x00000031
++#define CKK_GOST28147       0x00000032
++
+ #define CKK_VENDOR_DEFINED  0x80000000
+ 
+ 
+@@ -956,6 +961,13 @@ typedef CK_ULONG          CK_MECHANISM_T
+ #define CKM_DH_PKCS_PARAMETER_GEN      0x00002001
+ #define CKM_X9_42_DH_PARAMETER_GEN     0x00002002
+ 
++/* Russian GOST standards. PKCS#11 v2.30: Mechanisms. */
++#define CKM_GOSTR3410                  0x00001201
++#define CKM_GOSTR3411                  0x00001210
++#define CKA_GOSTR3410_PARAMS           0x00000250
++#define CKA_GOSTR3411_PARAMS           0x00000251
++#define CKA_GOST28147_PARAMS           0x00000252
++
+ #define CKM_VENDOR_DEFINED             0x80000000
+ 
+ typedef CK_MECHANISM_TYPE CK_PTR CK_MECHANISM_TYPE_PTR;
+Index: security/nss/lib/util/seccomon.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/seccomon.h,v
+retrieving revision 1.7
+diff -u -p -r1.7 seccomon.h
+--- security/nss/lib/util/seccomon.h	12 Oct 2007 01:44:51 -0000	1.7
++++ security/nss/lib/util/seccomon.h	24 Sep 2009 15:16:44 -0000
+@@ -116,4 +116,8 @@ typedef enum _SECComparison {
+     SECGreaterThan = 1
+ } SECComparison;
+ 
++/* How much octets occupies bit-string of bitLen bits.
++*/
++#define BITLEN_TO_OCTETLEN(bitLen) (((bitLen) + 7) >> 3)
++
+ #endif /* _SECCOMMON_H_ */
+Index: security/nss/lib/util/secdert.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/secdert.h,v
+retrieving revision 1.5
+diff -u -p -r1.5 secdert.h
+--- security/nss/lib/util/secdert.h	12 Oct 2007 01:44:51 -0000	1.5
++++ security/nss/lib/util/secdert.h	24 Sep 2009 15:16:44 -0000
+@@ -157,7 +157,7 @@ struct DERTemplateStr {
+ */
+ #define DER_ConvertBitString(item)	  \
+ {					  \
+-    (item)->len = ((item)->len + 7) >> 3; \
++    (item)->len = BITLEN_TO_OCTETLEN((item)->len); \
+ }
+ 
+ #endif /* _SECDERT_H_ */
+Index: security/nss/lib/util/secitem.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/secitem.c,v
+retrieving revision 1.15
+diff -u -p -r1.15 secitem.c
+--- security/nss/lib/util/secitem.c	19 Nov 2008 16:04:38 -0000	1.15
++++ security/nss/lib/util/secitem.c	24 Sep 2009 15:16:44 -0000
+@@ -235,21 +235,27 @@ SECITEM_ArenaDupItem(PRArenaPool *arena,
+ }
+ 
+ SECStatus
+-SECITEM_CopyItem(PRArenaPool *arena, SECItem *to, const SECItem *from)
++SECITEM_CopyItem(PRArenaPool *arena, SECItem *to, const SECItem *from) {
++    return SECITEM_CopyData( arena, to, from->type, from->data, from->len );
++}
++
++SECStatus
++SECITEM_CopyData(PRArenaPool *arena, SECItem *to,
++    SECItemType type, const unsigned char *data, unsigned int len )
+ {
+-    to->type = from->type;
+-    if (from->data && from->len) {
++    to->type = type;
++    if (data && len) {
+ 	if ( arena ) {
+-	    to->data = (unsigned char*) PORT_ArenaAlloc(arena, from->len);
++	    to->data = (unsigned char*) PORT_ArenaAlloc(arena, len);
+ 	} else {
+-	    to->data = (unsigned char*) PORT_Alloc(from->len);
++	    to->data = (unsigned char*) PORT_Alloc(len);
+ 	}
+ 	
+ 	if (!to->data) {
+ 	    return SECFailure;
+ 	}
+-	PORT_Memcpy(to->data, from->data, from->len);
+-	to->len = from->len;
++	PORT_Memcpy(to->data, data, len);
++	to->len = len;
+     } else {
+ 	to->data = 0;
+ 	to->len = 0;
+Index: security/nss/lib/util/secitem.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/secitem.h,v
+retrieving revision 1.8
+diff -u -p -r1.8 secitem.h
+--- security/nss/lib/util/secitem.h	14 Jun 2008 14:20:38 -0000	1.8
++++ security/nss/lib/util/secitem.h	24 Sep 2009 15:16:44 -0000
+@@ -95,6 +95,10 @@ extern PRBool SECITEM_ItemsAreEqual(cons
+ */
+ extern SECStatus SECITEM_CopyItem(PLArenaPool *arena, SECItem *to, 
+                                   const SECItem *from);
++/*! Copy to "to", like SECITEM_CopyItem, but from arbitrary buffer.
++ */
++extern SECStatus SECITEM_CopyData(PLArenaPool *arena, SECItem *to,
++    SECItemType type, const unsigned char *data, unsigned int len );
+ 
+ /*
+ ** Allocate an item and copy "from" into it.
+Index: security/nss/lib/util/secoid.c
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/secoid.c,v
+retrieving revision 1.52
+diff -u -p -r1.52 secoid.c
+--- security/nss/lib/util/secoid.c	14 Apr 2009 02:04:08 -0000	1.52
++++ security/nss/lib/util/secoid.c	24 Sep 2009 15:16:44 -0000
+@@ -181,6 +181,11 @@
+  */
+ #define SEED_OID		 0x2a,0x83,0x1a,0x8c,0x9a,0x44,0x01
+ 
++/* for GOST R 34.10-2001, GOST R 34.11-94, GOST 28147
++ */
++/* CryptoPro: 1.2.643.2.2 */
++#define CRYPTOPRO_OIDS  0x2a,0x85,0x03,0x02,0x02
++
+ #define CONST_OID static const unsigned char
+ 
+ CONST_OID md2[]        				= { DIGEST, 0x02 };
+@@ -577,6 +582,15 @@ CONST_OID secgECsect571r1[] = {SECG_OID,
+ 
+ CONST_OID seed_CBC[]				= { SEED_OID, 4 };
+ 
++/* GOST OIDS @ CryptoPro [http://cryptopro.ru/cryptopro/documentation/cpdn/]
++ */
++CONST_OID oidCpGostR3411[]        = { CRYPTOPRO_OIDS, 0x09 };
++CONST_OID oidCpGostR3410EL[]      = { CRYPTOPRO_OIDS, 0x13 };
++CONST_OID oidCpGostR3411R3410EL[] = { CRYPTOPRO_OIDS, 0x03 };
++CONST_OID oidCpGostR3410EcA[]     = { CRYPTOPRO_OIDS, 0x23, 0x01 };
++CONST_OID oidCpGostR3410EcB[]     = { CRYPTOPRO_OIDS, 0x23, 0x02 };
++CONST_OID oidCpGostR3410EcC[]     = { CRYPTOPRO_OIDS, 0x23, 0x03 };
++
+ #define OI(x) { siDEROID, (unsigned char *)x, sizeof x }
+ #ifndef SECOID_NO_STRINGS
+ #define OD(oid,tag,desc,mech,ext) { OI(oid), tag, desc, mech, ext }
+@@ -1591,6 +1605,30 @@ const static SECOidData oids[SEC_OID_TOT
+     OD( x509CertificatePoliciesAnyPolicy, SEC_OID_X509_ANY_POLICY,
+  	"Certificate Policies AnyPolicy",
+         CKM_INVALID_MECHANISM, UNSUPPORTED_CERT_EXTENSION ),
++
++    /* GOST OIDS @ CryptoPro [http://cryptopro.ru/cryptopro/documentation/cpdn/]
++     */
++    OD( oidCpGostR3410EL, SEC_OID_CP_GOST_R3410EL,
++        "GOST R 34.10-2001 (EC DSA) public key",
++        CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION ),
++
++    OD( oidCpGostR3411R3410EL, SEC_OID_CP_GOST_R3411_R3410EL,
++        "GOST R 34.10-2001 (EC DSA) + GOST R 34.11-94 (digest)",
++        CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION ),
++
++    OD( oidCpGostR3411, SEC_OID_CP_GOST_R3411,
++        "GOST R 34.11-94 (digest)",
++        CKM_GOSTR3411, INVALID_CERT_EXTENSION ),
++
++    OD( oidCpGostR3410EcA, SEC_OID_CP_GOST_R3410EL_EC_A,
++	"CryptoPro elliptic curve A",
++	CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION ),
++    OD( oidCpGostR3410EcB, SEC_OID_CP_GOST_R3410EL_EC_B,
++	"CryptoPro elliptic curve B",
++	CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION ),
++    OD( oidCpGostR3410EcC, SEC_OID_CP_GOST_R3410EL_EC_C,
++	"CryptoPro elliptic curve C",
++	CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION ),
+ };
+ 
+ /* PRIVATE EXTENDED SECOID Table
+Index: security/nss/lib/util/secoidt.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/secoidt.h,v
+retrieving revision 1.30
+diff -u -p -r1.30 secoidt.h
+--- security/nss/lib/util/secoidt.h	14 Apr 2009 02:04:08 -0000	1.30
++++ security/nss/lib/util/secoidt.h	24 Sep 2009 15:16:44 -0000
+@@ -449,6 +449,15 @@ typedef enum {
+     SEC_OID_SEED_CBC			    = 302,
+ 
+     SEC_OID_X509_ANY_POLICY                 = 303,
++    
++    /* GOST OIDS @ CryptoPro [http://cryptopro.ru/cryptopro/documentation/cpdn/]
++     */
++    SEC_OID_CP_GOST_R3410EL                    = 304, /*GOST EC DSA pub.key */
++    SEC_OID_CP_GOST_R3411_R3410EL              = 305, /*GOST EC DSA(NOT X9.62)*/
++    SEC_OID_CP_GOST_R3411                      = 306, /* hash */
++    SEC_OID_CP_GOST_R3410EL_EC_A               = 307, /* cryptoPro curve A */
++    SEC_OID_CP_GOST_R3410EL_EC_B               = 308, /* cryptoPro curve B */
++    SEC_OID_CP_GOST_R3410EL_EC_C               = 309, /* cryptoPro curve C */
+ 
+     SEC_OID_TOTAL
+ } SECOidTag;
+Index: security/nss/lib/util/utilrename.h
+===================================================================
+RCS file: /cvsroot/mozilla/security/nss/lib/util/utilrename.h,v
+retrieving revision 1.4
+diff -u -p -r1.4 utilrename.h
+--- security/nss/lib/util/utilrename.h	16 Feb 2008 04:38:09 -0000	1.4
++++ security/nss/lib/util/utilrename.h	24 Sep 2009 15:16:44 -0000
+@@ -134,6 +134,7 @@
+ #define SECITEM_ArenaDupItem SECITEM_ArenaDupItem_Util
+ #define SECITEM_CompareItem SECITEM_CompareItem_Util
+ #define SECITEM_CopyItem SECITEM_CopyItem_Util
++#define SECITEM_CopyData SECITEM_CopyData_Util
+ #define SECITEM_DupItem SECITEM_DupItem_Util
+ #define SECITEM_FreeItem SECITEM_FreeItem_Util
+ #define SECITEM_ItemsAreEqual SECITEM_ItemsAreEqual_Util
