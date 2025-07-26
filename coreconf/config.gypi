@@ -136,6 +136,7 @@
     'nss_include_dir%': '/usr/include/nss',
     'only_dev_random%': 1,
     'disable_fips%': 1,
+    'disable_gost%': 1,
     'fips_module_id%': '',
     'mozpkix_only%': 0,
     'mozilla_central%': 0,
@@ -175,6 +176,11 @@
         'defines': [
           'NSS_FIPS_DISABLED',
           'NSS_NO_INIT_SUPPORT',
+        ],
+      }],
+      [ 'disable_gost==0', {
+        'defines': [
+          'NSS_ENABLE_GOST',
         ],
       }],
       [ 'fips_module_id!=""', {

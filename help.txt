@@ -5,7 +5,8 @@ Usage: build.sh [-h] [-c|-cc] [-v] [-j <n>] [--gyp|-g] [--opt|-o]
                 [--fuzz[=tls|oss]] [--sancov[=edge|bb|func|...]]
                 [--emit-llvm] [--no-zdefs] [--static] [--ct-verif]
                 [--nspr|--with-nspr=<include>:<lib>|--system-nspr]
-                [--system-sqlite] [--enable-fips] [--enable-libpkix]
+                [--system-sqlite] [--enable-fips] [--enable-gost]
+                [--enable-libpkix]
                 [--mozpkix-only] [-D<gyp-option>]
                 [--rebuild] [--enable-legacy-db]
 
@@ -53,6 +54,7 @@ NSS build tool options:
                      shorthand for --with-nspr=/usr/include/nspr:
     --system-sqlite  use system sqlite
     --enable-fips    enable FIPS checks
+    --enable-gost    enable GOST algorithms
     --enable-libpkix make libpkix part of the build
     --enable-legacy-db enable the legacy db (libnssdbm)
     --mozpkix-only   build only static mozpkix and mozpkix-test libraries
