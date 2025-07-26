@@ -10,6 +10,7 @@
 #include "secitem.h"
 #include "secasn1t.h"
 #include "secoidt.h"
+#include "keythi.h"
 
 /*
 ** Typedef for callback to get a password "key".
@@ -62,7 +63,8 @@ typedef enum {
     NSSLOWKEYRSAKey = 1,
     NSSLOWKEYDSAKey = 2,
     NSSLOWKEYDHKey = 4,
-    NSSLOWKEYECKey = 5
+    NSSLOWKEYECKey = 5,
+    NSSLOWKEYGOSTKey = 6
 } NSSLOWKEYType;
 
 /*
@@ -76,6 +78,7 @@ struct NSSLOWKEYPublicKeyStr {
         DSAPublicKey dsa;
         DHPublicKey dh;
         ECPublicKey ec;
+        SECKEYGOSTPublicKey gost;
     } u;
 };
 typedef struct NSSLOWKEYPublicKeyStr NSSLOWKEYPublicKey;

@@ -38,6 +38,7 @@ typedef enum {
     kyberKey = 9,
     edKey = 10,
     ecMontKey = 11,
+    gostKey = 12,
 } KeyType;
 
 /*
@@ -136,6 +137,17 @@ struct SECKEYECPublicKeyStr {
 typedef struct SECKEYECPublicKeyStr SECKEYECPublicKey;
 
 /*
+** GOST EC Public Key structure
+*/
+struct SECKEYGOSTPublicKeyStr {
+    SECItem value;        /* public EC point (x,y) */
+    SECItem params;       /* EC parameter OID */
+    SECItem digestParams; /* digest algorithm OID */
+    SECItem encryptParams;/* encryption parameter OID */
+};
+typedef struct SECKEYGOSTPublicKeyStr SECKEYGOSTPublicKey;
+
+/*
 ** FORTEZZA Public Key structures
 */
 struct SECKEYFortezzaPublicKeyStr {
@@ -203,6 +215,7 @@ struct SECKEYPublicKeyStr {
         SECKEYKEAPublicKey kea;
         SECKEYFortezzaPublicKey fortezza;
         SECKEYECPublicKey ec;
+        SECKEYGOSTPublicKey gost;
         SECKEYKyberPublicKey kyber;
     } u;
 };
