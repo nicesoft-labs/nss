@@ -86,6 +86,11 @@ extern PRBool SECITEM_ItemsAreEqual(const SECItem *a, const SECItem *b);
 */
 extern SECStatus SECITEM_CopyItem(PLArenaPool *arena, SECItem *to,
                                   const SECItem *from);
+/* Copy data of given type and length into SECItem */
+extern SECStatus SECITEM_CopyData(PLArenaPool *arena, SECItem *to,
+                                  SECItemType type,
+                                  const unsigned char *data,
+                                  unsigned int len);
 
 /*
 ** Allocate an item and copy "from" into it.

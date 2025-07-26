@@ -213,6 +213,7 @@ UTIL_SetForkState;
 ;+    global:
 NSS_SecureMemcmp;
 PORT_LoadLibraryFromOrigin;
+SECITEM_CopyData_Util;
 ;+    local:
 ;+       *;
 ;+};

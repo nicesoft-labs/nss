@@ -281,6 +281,31 @@ SECITEM_CopyItem(PLArenaPool *arena, SECItem *to, const SECItem *from)
     return SECSuccess;
 }
 
+SECStatus
+SECITEM_CopyData(PLArenaPool *arena, SECItem *to,
+                 SECItemType type, const unsigned char *data,
+                 unsigned int len)
+{
+    to->type = type;
+    if (data && len) {
+        if (arena) {
+            to->data = (unsigned char *)PORT_ArenaAlloc(arena, len);
+        } else {
+            to->data = (unsigned char *)PORT_Alloc(len);
+        }
+
+        if (!to->data) {
+            return SECFailure;
+        }
+        PORT_Memcpy(to->data, data, len);
+        to->len = len;
+    } else {
+        to->data = NULL;
+        to->len = 0;
+    }
+    return SECSuccess;
+}
+
 void
 SECITEM_FreeItem(SECItem *zap, PRBool freeit)
 {

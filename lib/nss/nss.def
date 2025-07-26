@@ -125,6 +125,7 @@ PORT_SetUCS4_UTF8ConversionFunction;
 PORT_SetUCS2_UTF8ConversionFunction;
 PORT_SetUCS2_ASCIIConversionFunction;
 SECITEM_CopyItem;
+SECITEM_CopyData;
 SECITEM_DupItem;
 SECITEM_FreeItem;
 SECITEM_ZfreeItem;

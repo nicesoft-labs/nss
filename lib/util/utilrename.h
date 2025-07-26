@@ -104,6 +104,7 @@
 #define SECITEM_ArenaDupItem SECITEM_ArenaDupItem_Util
 #define SECITEM_CompareItem SECITEM_CompareItem_Util
 #define SECITEM_CopyItem SECITEM_CopyItem_Util
+#define SECITEM_CopyData SECITEM_CopyData_Util
 #define SECITEM_DupItem SECITEM_DupItem_Util
 #define SECITEM_FreeItem SECITEM_FreeItem_Util
 #define SECITEM_ItemsAreEqual SECITEM_ItemsAreEqual_Util

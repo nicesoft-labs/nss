@@ -110,6 +110,7 @@
 #undef SECITEM_ArenaDupItem
 #undef SECITEM_CompareItem
 #undef SECITEM_CopyItem
+#undef SECITEM_CopyData
 #undef SECITEM_DupItem
 #undef SECITEM_FreeItem
 #undef SECITEM_ItemsAreEqual
@@ -377,6 +378,14 @@ SECITEM_CopyItem(PLArenaPool *arena, SECItem *to,
                  const SECItem *from)
 {
     return SECITEM_CopyItem_Util(arena, to, from);
+}
+
+SECStatus
+SECITEM_CopyData(PLArenaPool *arena, SECItem *to,
+                 SECItemType type, const unsigned char *data,
+                 unsigned int len)
+{
+    return SECITEM_CopyData_Util(arena, to, type, data, len);
 }
 
 SECItem *
