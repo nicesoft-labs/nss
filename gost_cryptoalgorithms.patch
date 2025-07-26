@@ -1,0 +1,3987 @@
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..24d3160
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,311 @@
++Makefile
++!build/wince/tools/Makefile
++*.so
++*.[ao]
++.deps
++_xpidlgen
++firefox.config
++firefox.creator
++firefox.creator.user
++firefox.files
++firefox.includes
++dist
++config.cache
++config.log
++config.status
++_leaktest
++_profile
++_tests
++*.pyc
++*.OBJ
++
++browser/app/firefox
++browser/app/firefox-bin
++browser/app/profile/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/install.rdf
++build/automation.py
++build/leaktest.py
++build/pgo/automation.py
++build/pgo/automationutils.py
++build/pgo/genpgocert.py
++build/pgo/profileserver.py
++build/wince/shunt/include/stdlib.h
++build/wince/shunt/include/windows.h
++build/wince/shunt/include/ymath.h
++config/autoconf.mk
++config/buildid
++config/doxygen.cfg
++config/elf-dynstr-gc
++config/final-link-libs
++config/myconfig.mk
++config/myrules.mk
++config/nfspwd
++config/nsinstall
++config/revdepth
++config/system_wrappers/
++content/base/test/TestNativeXMLHttpRequest
++content/base/test/TestPlainTextSerializer
++db/morkreader/external/nsMorkReader.cpp
++editor/txmgr/tests/TestTXMgr
++embedding/base/standalone/nsEmbedAPI.cpp
++embedding/browser/gtk/src/gtkmozembedmarshal.c
++embedding/browser/gtk/src/gtkmozembedmarshal.h
++embedding/browser/gtk/tests/TestGtkEmbed
++embedding/browser/gtk/tests/TestGtkEmbedChild
++embedding/browser/gtk/tests/TestGtkEmbedNotebook
++embedding/browser/gtk/tests/TestGtkEmbedSocket
++extensions/pref/system-pref/src/gconf/nsSystemPrefFactory.cpp
++extensions/universalchardet/tests/UniversalChardetTest
++gfx/cairo/cairo/src/cairo-features.h
++gfx/tests/TestColorNames
++gfx/tests/TestRect
++gfx/thebes/test/gfxFontSelectionTest
++gfx/thebes/test/gfxSurfaceRefCountTest
++gfx/thebes/test/gfxTextRunPerfTest
++gfx/thebes/test/gfxWordCacheTest
++intl/lwbrk/tests/TestLineBreak
++intl/uconv/tests/TestUConv
++intl/uconv/tests/nsconv
++intl/uconv/tests/plattest
++intl/unicharutil/tests/NormalizationTest
++intl/unicharutil/tests/UnicharSelfTest
++intl/unicharutil/util/internal/nsBidiUtils.cpp
++intl/unicharutil/util/internal/nsCompressedCharMap.cpp
++intl/unicharutil/util/internal/nsUnicharUtils.cpp
++js/src/config/autoconf.mk
++js/src/config/myconfig.mk
++js/src/config/myrules.mk
++js/src/config/nfspwd
++js/src/config/nsinstall
++js/src/config/revdepth
++js/src/config/system_wrappers_js/
++js/src/host_jskwgen
++js/src/host_jsoplengen
++js/src/js
++js/src/js-config
++js/src/js-config.h
++js/src/jsautocfg.h
++js/src/jsautokw.h
++js/src/jsautooplen.h
++js/src/jscpucfg
++js/src/mozilla-config.h
++js/src/unallmakefiles
++js/src/xpconnect/shell/xpcshell
++js/src/xpconnect/src/dom_quickstubs.cpp
++js/src/xpconnect/src/dom_quickstubs.h
++js/src/xpconnect/tests/TestXPC
++layout/html/tests/ParseCSS
++layout/html/tests/TestCSSPropertyLookup
++layout/style/test/css_properties.js
++layout/style/test/host_ListCSSProperties
++layout/tools/reftest/autoconf.js
++layout/tools/reftest/automation.py
++layout/tools/reftest/automationutils.py
++modules/libjar/standalone/nsWildCard.cpp
++modules/libjar/standalone/nsZipArchive.cpp
++modules/libmar/tool/mar
++modules/libpr0n/build/nsImgBuildDefines.h
++modules/libreg/standalone/VerReg.c
++modules/libreg/standalone/reg.c
++modules/libreg/standalone/vr_stubs.c
++modules/zlib/standalone/adler32.c
++modules/zlib/standalone/compress.c
++modules/zlib/standalone/crc32.c
++modules/zlib/standalone/deflate.c
++modules/zlib/standalone/gzio.c
++modules/zlib/standalone/infback.c
++modules/zlib/standalone/inffast.c
++modules/zlib/standalone/inflate.c
++modules/zlib/standalone/inftrees.c
++modules/zlib/standalone/trees.c
++modules/zlib/standalone/uncompr.c
++modules/zlib/standalone/zutil.c
++mozilla-config.h
++netwerk/dns/src/etld_data.inc
++netwerk/necko-config.h
++netwerk/streamconv/test/TestStreamConv
++netwerk/test/PropertiesTest
++netwerk/test/ReadNTLM
++netwerk/test/TestBlockingSocket
++netwerk/test/TestCallbacks
++netwerk/test/TestCookie
++netwerk/test/TestDNS
++netwerk/test/TestIDN
++netwerk/test/TestIOThreads
++netwerk/test/TestIncrementalDownload
++netwerk/test/TestOpen
++netwerk/test/TestPageLoad
++netwerk/test/TestPerf
++netwerk/test/TestProtocols
++netwerk/test/TestServ
++netwerk/test/TestSocketTransport
++netwerk/test/TestStandardURL
++netwerk/test/TestStreamChannel
++netwerk/test/TestStreamLoader
++netwerk/test/TestStreamPump
++netwerk/test/TestStreamTransport
++netwerk/test/TestUDPSocketProvider
++netwerk/test/TestURLParser
++netwerk/test/TestUpload
++netwerk/test/urltest
++nsprpub/config/autoconf.mk
++nsprpub/config/nfspwd
++nsprpub/config/now
++nsprpub/config/nsinstall
++nsprpub/config/nspr-config
++nsprpub/config/nsprincl.mk
++nsprpub/config/nsprincl.sh
++nsprpub/lib/ds/_pl_bld.h
++nsprpub/lib/libc/src/_pl_bld.h
++nsprpub/pr/src/_pr_bld.h
++nsprpub/unallmakefiles
++parser/htmlparser/tests/grabpage/grabpage
++parser/htmlparser/tests/html/TestParser
++parser/htmlparser/tests/outsinks/TestOutput
++profile/dirserviceprovider/standalone/nsProfileDirServiceProvider.cpp
++profile/dirserviceprovider/standalone/nsProfileLock.cpp
++rdf/tests/rdfcat/rdfcat
++rdf/tests/rdfpoll/rdfpoll
++rdf/tests/triplescat/triplescat
++rdf/util/src/internal/nsRDFResource.cpp
++security/manager/.nss.checkout
++security/manager/.nss.cleaned
++storage/test/teststorage1
++testing/mochitest/automation.py
++testing/mochitest/automationutils.py
++testing/mochitest/runtests.py
++testing/mochitest/ssltunnel/ssltunnel
++toolkit/components/filepicker/src/nsFilePicker.js
++toolkit/components/url-classifier/tests/TestUrlClassifierUtils
++toolkit/crashreporter/client/crashreporter
++toolkit/crashreporter/client/http_upload.cc
++toolkit/crashreporter/google-breakpad/src/tools/linux/dump_syms/dump_syms
++toolkit/crashreporter/test/TestCrashReporterAPI
++toolkit/library/dlldeps.cpp
++toolkit/library/nsBidiUtils.cpp
++toolkit/library/nsCompressedCharMap.cpp
++toolkit/library/nsRDFResource.cpp
++toolkit/library/nsUnicharUtils.cpp
++toolkit/mozapps/downloads/src/nsHelperAppDlg.js
++toolkit/mozapps/extensions/src/nsExtensionManager.js
++toolkit/mozapps/plugins/tests/BadPlugin
++toolkit/mozapps/plugins/tests/GoodPlugin
++toolkit/mozapps/update/src/nsUpdateService.js
++toolkit/mozapps/update/src/updater/updater
++toolkit/mozapps/update/test/TestAUSReadStrings
++toolkit/profile/src/nsProfileLock.cpp
++toolkit/xre/platform.ini
++unallmakefiles
++uriloader/exthandler/tests/WriteArgument
++widget/src/xremoteclient/mozilla-xremote-client
++xpcom/build/nsArrayEnumerator.cpp
++xpcom/build/nsArrayUtils.cpp
++xpcom/build/nsAutoLock.cpp
++xpcom/build/nsCOMArray.cpp
++xpcom/build/nsCOMPtr.cpp
++xpcom/build/nsCRTGlue.cpp
++xpcom/build/nsCategoryCache.cpp
++xpcom/build/nsComponentManagerUtils.cpp
++xpcom/build/nsCycleCollectionParticipant.cpp
++xpcom/build/nsDeque.cpp
++xpcom/build/nsEnumeratorUtils.cpp
++xpcom/build/nsGREGlue.cpp
++xpcom/build/nsGenericFactory.cpp
++xpcom/build/nsID.cpp
++xpcom/build/nsIInterfaceRequestorUtils.cpp
++xpcom/build/nsINIParser.cpp
++xpcom/build/nsISupportsImpl.cpp
++xpcom/build/nsMemory.cpp
++xpcom/build/nsProxyRelease.cpp
++xpcom/build/nsQuickSort.cpp
++xpcom/build/nsTArray.cpp
++xpcom/build/nsTHashtable.cpp
++xpcom/build/nsTObserverArray.cpp
++xpcom/build/nsTextFormatter.cpp
++xpcom/build/nsThreadUtils.cpp
++xpcom/build/nsVersionComparator.cpp
++xpcom/build/nsVoidArray.cpp
++xpcom/build/nsWeakReference.cpp
++xpcom/build/pldhash.c
++xpcom/glue/standalone/nsArrayEnumerator.cpp
++xpcom/glue/standalone/nsArrayUtils.cpp
++xpcom/glue/standalone/nsCOMArray.cpp
++xpcom/glue/standalone/nsCOMPtr.cpp
++xpcom/glue/standalone/nsCRTGlue.cpp
++xpcom/glue/standalone/nsCategoryCache.cpp
++xpcom/glue/standalone/nsComponentManagerUtils.cpp
++xpcom/glue/standalone/nsCycleCollectionParticipant.cpp
++xpcom/glue/standalone/nsDeque.cpp
++xpcom/glue/standalone/nsEnumeratorUtils.cpp
++xpcom/glue/standalone/nsGREGlue.cpp
++xpcom/glue/standalone/nsID.cpp
++xpcom/glue/standalone/nsIInterfaceRequestorUtils.cpp
++xpcom/glue/standalone/nsINIParser.cpp
++xpcom/glue/standalone/nsISupportsImpl.cpp
++xpcom/glue/standalone/nsMemory.cpp
++xpcom/glue/standalone/nsQuickSort.cpp
++xpcom/glue/standalone/nsStringAPI.cpp
++xpcom/glue/standalone/nsTArray.cpp
++xpcom/glue/standalone/nsTHashtable.cpp
++xpcom/glue/standalone/nsTObserverArray.cpp
++xpcom/glue/standalone/nsThreadUtils.cpp
++xpcom/glue/standalone/nsVersionComparator.cpp
++xpcom/glue/standalone/nsVoidArray.cpp
++xpcom/glue/standalone/nsWeakReference.cpp
++xpcom/glue/standalone/pldhash.c
++xpcom/idl-parser/xpidl_debug
++xpcom/idl-parser/xpidllex.py
++xpcom/idl-parser/xpidlyacc.py
++xpcom/proxy/tests/proxy-create-threadsafety
++xpcom/proxy/tests/proxytests
++xpcom/reflect/xptcall/tests/TestXPTCInvoke
++xpcom/reflect/xptinfo/tests/TestInterfaceInfo
++xpcom/sample/program/nsTestSample
++xpcom/tests/TestArguments
++xpcom/tests/TestArray
++xpcom/tests/TestAtoms
++xpcom/tests/TestAutoLock
++xpcom/tests/TestAutoPtr
++xpcom/tests/TestBlockingProcess
++xpcom/tests/TestCOMPtr
++xpcom/tests/TestCOMPtrEq
++xpcom/tests/TestCRT
++xpcom/tests/TestCallTemplates
++xpcom/tests/TestDeque
++xpcom/tests/TestEncoding
++xpcom/tests/TestExpirationTracker
++xpcom/tests/TestFactory
++xpcom/tests/TestHashtables
++xpcom/tests/TestID
++xpcom/tests/TestINIParser
++xpcom/tests/TestOOM
++xpcom/tests/TestObserverService
++xpcom/tests/TestPermanentAtoms
++xpcom/tests/TestPipe
++xpcom/tests/TestPipes
++xpcom/tests/TestProxies
++xpcom/tests/TestQuickReturn
++xpcom/tests/TestRacingServiceManager
++xpcom/tests/TestRegistrationOrder
++xpcom/tests/TestServMgr
++xpcom/tests/TestStorageStream
++xpcom/tests/TestStringAPI
++xpcom/tests/TestStrings
++xpcom/tests/TestTArray
++xpcom/tests/TestTextFormatter
++xpcom/tests/TestThreadPool
++xpcom/tests/TestThreadPoolListener
++xpcom/tests/TestThreads
++xpcom/tests/TestTimers
++xpcom/tests/TestVersionComparator
++xpcom/tests/TestXPIDLString
++xpcom/tests/external/TestMinStringAPI
++xpcom/tests/nsIFileEnumerator
++xpcom/tests/nsIFileTest
++xpcom/tools/registry/regxpcom
++xpcom/typelib/xpidl/xpidl
++xpcom/typelib/xpt/tests/PrimitiveTest
++xpcom/typelib/xpt/tests/SimpleTypeLib
++xpcom/typelib/xpt/tools/xpt_dump
++xpcom/typelib/xpt/tools/xpt_link
++xpcom/xpcom-config.h
++xpcom/xpcom-private.h
+diff --git a/browser/base/content/credits.xhtml b/browser/base/content/credits.xhtml
+index 09c57e2..e04bf5b 100644
+--- a/browser/base/content/credits.xhtml
++++ b/browser/base/content/credits.xhtml
+@@ -218,6 +218,7 @@
+ 
+         <div class="creditsGroup">
+           <ul>
++            <li>Andrew Gavrilin</li>
+             <li>Josh Aas</li>
+             <li>Robert Accettura</li>
+             <li>Lucas Adamski</li>
+diff --git a/build/wince/tools/Makefile b/build/wince/tools/Makefile
+index ea1733f..629dcad 100755
+--- a/build/wince/tools/Makefile
++++ b/build/wince/tools/Makefile
+@@ -1,4 +1,3 @@
+-#
+ # ***** BEGIN LICENSE BLOCK *****
+ # Version: MPL 1.1/GPL 2.0/LGPL 2.1
+ #
+@@ -12,18 +11,19 @@
+ # for the specific language governing rights and limitations under the
+ # License.
+ #
+-# The Original Code is Mozilla CE Shunt Library.
++# The Original Code is Mozilla core build scripts.
++#
++# The Initial Developer of the Original Code is
++# Brad Lassey <blassey@mozilla.com>
+ #
+-# The Initial Developer of the Original Code is Mozilla Corporation.
+-# Portions created by the Initial Developer are Copyright (C) 2008
+-# the Initial Developer. All Rights Reserved.
++# Portions created by the Initial Developer are Copyright (C) 2005
++# the Mozilla Foundation <http://www.mozilla.org/>. All Rights Reserved.
+ #
+-# Contributor(s):
+-#	John Wolfe (wolfe@lobo.us)
++# Contributor(s): 
+ #
+ # Alternatively, the contents of this file may be used under the terms of
+-# either of the GNU General Public License Version 2 or later (the "GPL"),
+-# or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
++# either the GNU General Public License Version 2 or later (the "GPL"), or
++# the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ # in which case the provisions of the GPL or the LGPL are applicable instead
+ # of those above. If you wish to allow use of your version of this file only
+ # under the terms of either the GPL or the LGPL, and not to allow others to
+@@ -35,101 +35,24 @@
+ #
+ # ***** END LICENSE BLOCK *****
+ 
+-# this file is used directly during configure as well as included from Makefile.in
+-
+-DEVENV_FLAG=-
+-
+-CC=cl -O2
+-
+-MOZCE_DEVENV=vs$(MOZ_MSVCVERSION)
+-
+-MOZCE_TOOLS_DIR=$(TOPSRCDIR)/build/wince/tools
+-
+-ifdef MOZCE_NOT_CONFIGURE
+-MOZCE_TOOLS_BIN_DIR=$(OBJDIR)/build/wince/tools
+-else
+-# if we're building the tools in configure, we want them to go directly to the sdk 
+-# so they get rebuilt once we have a full environment
+-MOZCE_TOOLS_BIN_DIR=$(OBJDIR)/dist/sdk/bin
+-endif
+-
+-BUILD_SWITCH=$(DEVENV_FLAG)Build
+-REBUILD_SWITCH=$(DEVENV_FLAG)Rebuild
+-CLEAN_SWITCH=$(DEVENV_FLAG)clean
+-
+-ifeq ($(VCINSTALLDIR),)
+-$(error Environment variable VCINSTALLDIR not set! Are you using MozillaBuild?)
+-endif
++DEPTH = ../../..
++topsrcdir = ../../..
++srcdir = .
++VPATH = .
+ 
+-ifeq ($(WINCE_SDK_DIR),)
+-$(error Environment variable WINCE_SDK_DIR not set! It must be passed to make if not running from configure)
+-endif
+-
+-ifeq ($(MOZ_MSVCVERSION),)
+-$(error Environment variable MOZ_MSVCVERSION not set! Are you using MozillaBuild?)
+-endif
+ 
+-CFLAGS += \
+-  -DVC_PATH='"$(subst \,\\,$(VCINSTALLDIR))\\"' \
+-  -DWM_SDK_PATH='"$(subst \,\\,$(WINCE_SDK_DIR))\\"' \
+-  -DMOZCE_DEVENV='"$(MOZCE_DEVENV)"' \
+-  -DTOPSRCDIR='"$(TOPSRCDIR)"' \
+-  $(NULL)
++TOPSRCDIR = $(topsrcdir)
++OBJDIR = $(shell cd $(DEPTH); pwd -W)
++CFLAGS += -DHAVE_SHUNT
++MOZCE_NOT_CONFIGURE=1
++include $(DEPTH)/config/autoconf.mk
+ 
+-ifneq ($(WINDOWSSDKDIR),)
+-CFLAGS += -DWIN_SDK_PATH='"$(subst \,\\,$(WINDOWSSDKDIR))"'
+-else
+-ifeq ($(SDKDIR),)
+-$(error Environment variable WINDOWSSDKDIR not set! Are you using MozillaBuild?)
+-else
+-CFLAGS += -DWIN_SDK_PATH='"$(subst \,\\,$(SDKDIR))"'
++ifdef MOZ_MEMORY
++CFLAGS += -DMOZ_MEMORY
+ endif
+-endif
+-
+-ifdef VPATH
+-CFLAGS	+= -DSHUNT_INC='"$(OBJDIR)/dist/include/mozce_shunt"'
+-CFLAGS	+= -DSHUNT_LIB='"$(OBJDIR)/dist/lib"'
+-CFLAGS	+= -DJEMALLOC_LIB='"$(OBJDIR)/dist/lib/jemalloc.lib"'
+-endif
+-CFLAGS += -DEBUG -Zi
+-
+-SDK_TOOLS = $(MOZCE_TOOLS_BIN_DIR)/arm-wince-as.exe \
+-            $(MOZCE_TOOLS_BIN_DIR)/arm-wince-gcc.exe \
+-            $(MOZCE_TOOLS_BIN_DIR)/arm-wince-lib.exe \
+-            $(MOZCE_TOOLS_BIN_DIR)/arm-wince-link.exe \
+-            $(MOZCE_TOOLS_BIN_DIR)/arm-wince-res.exe 
+-
+-all: libs export
+-
+-libs: $(SDK_TOOLS)
+-
+-clean: clobber
+-
+-
+-clobber:
+-	rm $(MOZCE_TOOLS_BIN_DIR)/*.exe  
+-
+-$(MOZCE_TOOLS_BIN_DIR)/arm-wince-as.exe:	$(MOZCE_TOOLS_DIR)/arm-wince-as.c $(MOZCE_TOOLS_DIR)/toolspath.h $(MOZCE_TOOLS_DIR)/Makefile
+-	mkdir -p $(MOZCE_TOOLS_BIN_DIR);
+-	$(CC) $(CFLAGS) -Fo$(MOZCE_TOOLS_BIN_DIR) -Fe$@ $(MOZCE_TOOLS_DIR)/arm-wince-as.c
+-
+-$(MOZCE_TOOLS_BIN_DIR)/arm-wince-gcc.exe:	$(MOZCE_TOOLS_DIR)/arm-wince-gcc.c $(MOZCE_TOOLS_DIR)/toolspath.h $(MOZCE_TOOLS_DIR)/Makefile
+-	mkdir -p $(MOZCE_TOOLS_BIN_DIR);
+-	$(CC) $(CFLAGS) -Fo$(MOZCE_TOOLS_BIN_DIR) -Fe$@ $(MOZCE_TOOLS_DIR)/arm-wince-gcc.c
+-
+-$(MOZCE_TOOLS_BIN_DIR)/arm-wince-lib.exe:	$(MOZCE_TOOLS_DIR)/arm-wince-lib.c $(MOZCE_TOOLS_DIR)/toolspath.h $(MOZCE_TOOLS_DIR)/Makefile
+-	mkdir -p $(MOZCE_TOOLS_BIN_DIR);
+-	$(CC) $(CFLAGS) -Fo$(MOZCE_TOOLS_BIN_DIR) -Fe$@ $(MOZCE_TOOLS_DIR)/arm-wince-lib.c
+-
+-$(MOZCE_TOOLS_BIN_DIR)/arm-wince-link.exe:	$(MOZCE_TOOLS_DIR)/arm-wince-link.c $(MOZCE_TOOLS_DIR)/toolspath.h $(MOZCE_TOOLS_DIR)/Makefile
+-	mkdir -p $(MOZCE_TOOLS_BIN_DIR);
+-	$(CC) $(CFLAGS) -Fo$(MOZCE_TOOLS_BIN_DIR) -Fe$@ $(MOZCE_TOOLS_DIR)/arm-wince-link.c
+ 
+-$(MOZCE_TOOLS_BIN_DIR)/arm-wince-res.exe:	$(MOZCE_TOOLS_DIR)/arm-wince-res.c $(MOZCE_TOOLS_DIR)/toolspath.h $(MOZCE_TOOLS_DIR)/Makefile
+-	mkdir -p $(MOZCE_TOOLS_BIN_DIR);
+-	$(CC) $(CFLAGS) -Fo$(MOZCE_TOOLS_BIN_DIR) -Fe$@ $(MOZCE_TOOLS_DIR)/arm-wince-res.c
++include $(topsrcdir)/build/wince/tools/Makefile
+ 
++export::
+ 
+-export:: $(SDK_TOOLS)
+-	mkdir -p $(OBJDIR)/dist/sdk/bin
+-	cp $^ $(OBJDIR)/dist/sdk/bin
++tools::
+\ No newline at end of file
+diff --git a/config/config.mk b/config/config.mk
+index a446780..ae752a2 100644
+--- a/config/config.mk
++++ b/config/config.mk
+@@ -865,3 +865,7 @@ ifdef TIERS
+ DIRS += $(foreach tier,$(TIERS),$(tier_$(tier)_dirs))
+ STATIC_DIRS += $(foreach tier,$(TIERS),$(tier_$(tier)_staticdirs))
+ endif
++
++OPENSSL=$(DEPTH)/../openssl
++INCLUDES += -I$(OPENSSL)/include
++EXTRA_LIBS += -L$(OPENSSL) -lssl -lcrypto
+diff --git a/config/rules.mk b/config/rules.mk
+index cd2059c..967b299 100644
+--- a/config/rules.mk
++++ b/config/rules.mk
+@@ -1289,7 +1289,7 @@ endif
+ 		ofiles=`$(AR_LIST) $${lib}`; \
+ 		$(AR_DELETE) $${lib} $$ofiles; \
+ 	done
+-	$(MKSHLIB) $(SHLIB_LDSTARTFILE) $(OBJS) $(LOBJS) $(SUB_SHLOBJS) $(DTRACE_PROBE_OBJ) $(PROBE_LOBJS) $(RESFILE) $(LDFLAGS) $(EXTRA_DSO_LDOPTS) $(OS_LIBS) $(EXTRA_LIBS) $(DEF_FILE) $(SHLIB_LDENDFILE)
++	$(MKSHLIB) $(SHLIB_LDSTARTFILE) $(OBJS) $(LOBJS) $(SUB_SHLOBJS) $(DTRACE_PROBE_OBJ) $(PROBE_LOBJS) $(RESFILE) $(LDFLAGS) $(EXTRA_DSO_LDOPTS) $(OS_LIBS) $(INCLUDES) $(EXTRA_LIBS) $(DEF_FILE) $(SHLIB_LDENDFILE)
+ 	@rm -f $(PROBE_LOBJS)
+ 	@rm -f $(DTRACE_PROBE_OBJ)
+ 	@for lib in $(MOZILLA_PROBE_LIBS); do \
+@@ -1298,7 +1298,7 @@ endif
+ 	@rm -f $(MOZILLA_PROBE_LIBS)
+ 
+ else # ! DTRACE_LIB_DEPENDENT
+-	$(MKSHLIB) $(SHLIB_LDSTARTFILE) $(OBJS) $(DTRACE_PROBE_OBJ) $(LOBJS) $(SUB_SHLOBJS) $(RESFILE) $(LDFLAGS) $(EXTRA_DSO_LDOPTS) $(OS_LIBS) $(EXTRA_LIBS) $(DEF_FILE) $(SHLIB_LDENDFILE)
++	$(MKSHLIB) $(SHLIB_LDSTARTFILE) $(OBJS) $(DTRACE_PROBE_OBJ) $(LOBJS) $(SUB_SHLOBJS) $(RESFILE) $(LDFLAGS) $(EXTRA_DSO_LDOPTS) $(OS_LIBS) $(INCLUDES) $(EXTRA_LIBS) $(DEF_FILE) $(SHLIB_LDENDFILE)
+ endif # DTRACE_LIB_DEPENDENT
+ 
+ ifeq (_WINNT,$(GNU_CC)_$(OS_ARCH))
+diff --git a/memory/jemalloc/jemalloc.c b/memory/jemalloc/jemalloc.c
+index d5e01f8..aff837e 100644
+--- a/memory/jemalloc/jemalloc.c
++++ b/memory/jemalloc/jemalloc.c
+@@ -2905,9 +2905,9 @@ arena_run_reg_dalloc(arena_run_t *run, arena_bin_t *bin, void *ptr, size_t size)
+ 		    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7
+ 		};
+ 
+-		if (size <= 128)
++                if (size <= 128)
+ 			regind = (diff >> log2_table[size - 1]);
+-		else if (size <= 32768)
++                else if (size <= 32768)
+ 			regind = diff >> (8 + log2_table[(size >> 8) - 1]);
+ 		else {
+ 			/*
+diff --git a/security/manager/locales/en-US/chrome/pipnss/pipnss.properties b/security/manager/locales/en-US/chrome/pipnss/pipnss.properties
+index 6ac5865..68e45a1 100644
+--- a/security/manager/locales/en-US/chrome/pipnss/pipnss.properties
++++ b/security/manager/locales/en-US/chrome/pipnss/pipnss.properties
+@@ -405,3 +405,6 @@ CertOrgUnknown=(Unknown)
+ CertNotStored=(Not Stored)
+ CertExceptionPermanent=Permanent
+ CertExceptionTemporary=Temporary
++# GOST_89_94_2001
++CertDumpGostR3410_2001=GOST R 34.10-2001
++CertDumpGostR3411_94_With_GostR3410_2001=GOST R 34.11-94 with GOST R 34.10-2001
+diff --git a/security/manager/ssl/src/nsCertOverrideService.cpp b/security/manager/ssl/src/nsCertOverrideService.cpp
+index 0efb04c..6fc21aa 100644
+--- a/security/manager/ssl/src/nsCertOverrideService.cpp
++++ b/security/manager/ssl/src/nsCertOverrideService.cpp
+@@ -518,7 +518,7 @@ nsCertOverrideService::RememberValidityOverride(const nsACString & aHostName, PR
+     PK11SlotInfo *slot = PK11_GetInternalKeySlot();
+     if (!slot)
+       return NS_ERROR_FAILURE;
+-  
++
+     SECStatus srv = PK11_ImportCert(slot, nsscert, CK_INVALID_HANDLE, 
+                                     const_cast<char*>(nickname.get()), PR_FALSE);
+     PK11_FreeSlot(slot);
+diff --git a/security/manager/ssl/src/nsKeygenHandler.cpp b/security/manager/ssl/src/nsKeygenHandler.cpp
+index 384524b..655c2a7 100644
+--- a/security/manager/ssl/src/nsKeygenHandler.cpp
++++ b/security/manager/ssl/src/nsKeygenHandler.cpp
+@@ -381,6 +381,7 @@ PRUint32 MapGenMechToAlgoMech(PRUint32 mechanism)
+            to search the token list three times. */
+     case CKM_EC_KEY_PAIR_GEN:
+         /* The default should also work for EC key pair generation. */
++    /* GOST_89_94_2001 */
+     default:
+         searchMech = mechanism;
+         break;
+@@ -647,6 +648,7 @@ found_match:
+              */
+             algTag = SEC_OID_ANSIX962_ECDSA_SIGNATURE_WITH_SHA1_DIGEST;
+             break;
++      /* GOST_89_94_2001 */
+       default:
+           goto loser;
+       }
+diff --git a/security/manager/ssl/src/nsNSSCertHelper.cpp b/security/manager/ssl/src/nsNSSCertHelper.cpp
+index 972afd6..1271a4f 100644
+--- a/security/manager/ssl/src/nsNSSCertHelper.cpp
++++ b/security/manager/ssl/src/nsNSSCertHelper.cpp
+@@ -620,6 +620,13 @@ GetOIDText(SECItem *oid, nsINSSComponent *nssComponent, nsAString &text)
+   case SEC_OID_SECG_EC_SECT571R1:
+     bundlekey = "CertDumpECsect571r1";
+     break;
++  /* GOST_89_94_2001 */
++  case SEC_OID_PKCS7_GOSTR3410_2001:
++    bundlekey = "CertDumpGostR3410_2001";
++    break;
++  case SEC_OID_PKCS7_GOSTR3411_94_WITH_GOSTR3410_2001:
++    bundlekey= "CertDumpGostR3411_94_With_GostR3410_2001";
++    break;
+   default: 
+     if (oidTag == SEC_OID(MS_CERT_EXT_CERTTYPE)) {
+       bundlekey = "CertDumpMSCerttype";
+@@ -1910,6 +1917,8 @@ ProcessSubjectPublicKeyInfo(CERTSubjectPublicKeyInfo *spki,
+          /* Too many parameters, to rarely used to bother displaying it */
+          break;
+       case nullKey:
++      /* GOST_89_94_2001 */
++      /*case gostKey:*/
+       default:
+          /* Algorithm unknown */
+          break;
+diff --git a/security/manager/ssl/src/nsNSSComponent.cpp b/security/manager/ssl/src/nsNSSComponent.cpp
+index efeb3a3..5840dfb 100644
+--- a/security/manager/ssl/src/nsNSSComponent.cpp
++++ b/security/manager/ssl/src/nsNSSComponent.cpp
+@@ -1062,6 +1062,7 @@ static CipherPref CipherPrefs[] = {
+  {"security.ssl3.rsa_null_sha", SSL_RSA_WITH_NULL_SHA}, // No encryption with RSA authentication and a SHA1 MAC
+  {"security.ssl3.rsa_null_md5", SSL_RSA_WITH_NULL_MD5}, // No encryption with RSA authentication and an MD5 MAC
+  {"security.ssl3.rsa_seed_sha", TLS_RSA_WITH_SEED_CBC_SHA}, // SEED encryption with RSA and a SHA1 MAC
++ /* GOST_89_94_2001 */
+  {NULL, 0} /* end marker */
+ };
+ 
+diff --git a/security/manager/ssl/src/nsNSSIOLayer.cpp b/security/manager/ssl/src/nsNSSIOLayer.cpp
+index 80dd6a7..7c85873 100644
+--- a/security/manager/ssl/src/nsNSSIOLayer.cpp
++++ b/security/manager/ssl/src/nsNSSIOLayer.cpp
+@@ -3101,6 +3101,66 @@ done:
+   return ret;
+ }
+ 
++SECStatus nsNSS_SSLGetClientAuthDERData(void* arg, PRFileDesc* socket,
++                                                                   CERTDistNames* caNames,
++                                                                   SECItem** pRetDERCert,
++                                                                   SECItem** pRetDERKey)
++{
++    CERTCertificate* pRetCert = NULL;
++    SECKEYPrivateKey* pRetKey = NULL;
++
++    if (nsNSS_SSLGetClientAuthData(arg, socket, caNames, &pRetCert, &pRetKey) != SECSuccess) {
++        return SECFailure;
++    }
++
++    if (pRetCert) {
++        *pRetDERCert = SECITEM_AllocItem(NULL, NULL, pRetCert->derCert.len);
++
++        SECITEM_CopyItem(NULL, *pRetDERCert, &pRetCert->derCert);
++    }
++
++    if (pRetKey) {
++        CK_ITEM_PTR derPK = PK11_GetDBPrivateKey(pRetKey->pkcs11Slot, pRetKey->pkcs11ID);
++        if (derPK) {
++            *pRetDERKey = SECITEM_AllocItem(NULL, NULL, derPK->len);
++
++            (*pRetDERKey)->type = (SECItemType)derPK->type;
++            PORT_Memcpy((*pRetDERKey)->data, derPK->data, derPK->len);
++            (*pRetDERKey)->len = derPK->len;
++
++            if (derPK->len) PORT_ZFree(derPK->data, derPK->len);
++            PORT_ZFree(derPK, sizeof(CK_ITEM));
++        }
++        /*SECItem *pwitem = SECITEM_AllocItem(NULL, NULL, 1);
++        memcpy(pwitem->data, "", 1);
++
++        if (pwitem) {
++            SECOidTag algorithm = SEC_OID_PKCS12_PBE_WITH_SHA1_AND_TRIPLE_DES_CBC;
++            /*SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_40_BIT_RC2_CBC*/
++            /*SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_3KEY_TRIPLE_DES_CBC*/
++
++            /*SECKEYEncryptedPrivateKeyInfo *epki = PK11_ExportEncryptedPrivKeyInfo(
++                    pRetKey->pkcs11Slot, algorithm, pwitem, pRetKey, 1, pRetKey->wincx);
++
++            if (epki) {
++                *pRetDERKey = SEC_ASN1EncodeItem (NULL, NULL, epki, SECKEY_EncryptedPrivateKeyInfoTemplate);
++
++                SECKEY_DestroyEncryptedPrivateKeyInfo(epki, PR_TRUE);
++            }
++
++            SECITEM_ZfreeItem(pwitem, PR_TRUE);
++        }*/
++    }
++
++    if (pRetCert)
++        CERT_DestroyCertificate(pRetCert);
++    if (pRetKey)
++        SECKEY_DestroyPrivateKey(pRetKey);
++
++    return pRetDERCert && pRetDERKey ? SECSuccess : SECFailure;
++}
++/* GOST_89_94_2001 */
++
+ static SECStatus
+ cancel_and_failure(nsNSSSocketInfo* infoObject)
+ {
+@@ -3373,9 +3433,14 @@ nsSSLIOLayerImportFD(PRFileDesc *fd,
+   if (anonymousLoad) {
+       SSL_GetClientAuthDataHook(sslSock, NULL, infoObject);
+   } else {
+-      SSL_GetClientAuthDataHook(sslSock, 
++      SSL_GetClientAuthDataHook(sslSock,
+                             (SSLGetClientAuthData)nsNSS_SSLGetClientAuthData,
+                             infoObject);
++      /* GOST_89_94_2001 */
++      SSL_GetClientAuthDERDataHook(sslSock,
++                            (SSLGetClientAuthDERData)nsNSS_SSLGetClientAuthDERData,
++                            infoObject);
++      /* GOST_89_94_2001 */
+   }
+   SSL_AuthCertificateHook(sslSock, AuthCertificateCallback, 0);
+ 
+diff --git a/security/nss/cmd/certutil/keystuff.c b/security/nss/cmd/certutil/keystuff.c
+index 1b1852d..6844435 100644
+--- a/security/nss/cmd/certutil/keystuff.c
++++ b/security/nss/cmd/certutil/keystuff.c
+@@ -587,6 +587,8 @@ CERTUTIL_GeneratePrivateKey(KeyType keytype, PK11SlotInfo *slot, int size,
+ 	    return NULL;
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	return NULL;
+     }
+diff --git a/security/nss/cmd/crmftest/testcrmf.c b/security/nss/cmd/crmftest/testcrmf.c
+index 4d6b058..88c352d 100644
+--- a/security/nss/cmd/crmftest/testcrmf.c
++++ b/security/nss/cmd/crmftest/testcrmf.c
+@@ -1040,6 +1040,8 @@ DoKeyRecovery( SECKEYPrivateKey *privKey)
+     case dhKey:
+         mech.mechanism = CKM_DH_PKCS_DERIVE;
+ 	break;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+         printf ("Bad Key type in key recovery.\n");
+ 	return 512;
+diff --git a/security/nss/cmd/lib/pk11table.c b/security/nss/cmd/lib/pk11table.c
+index 5ec551f..68b2f80 100644
+--- a/security/nss/cmd/lib/pk11table.c
++++ b/security/nss/cmd/lib/pk11table.c
+@@ -603,6 +603,10 @@ const Constant _consts[] = {
+ 
+ 	mkEntry(CK_EFFECTIVELY_INFINITE, AvailableSizes),
+ 	mkEntry(CK_UNAVAILABLE_INFORMATION, CurrentSize),
++
++        /* GOST_89_94_2001 */
++        /*mkEntry(CKM_GOSTR3410_2001, Mechanism),
++        mkEntry(CKM_GOSTR3411_94_WITH_GOSTR3410_2001, Mechanism)*/
+ };
+ 
+ const Constant *consts = &_consts[0];
+@@ -802,8 +806,8 @@ const Commands _commands[] = {
+ " hObject      the object's handle\n"
+ " pTemplate    specifies attrs; gets vals\n"
+ " ulCount      attributes in template\n",
+-	{ArgULong, ArgULong, ArgAttribute|ArgArray, ArgULong, ArgNone,
+-	 ArgNone, ArgNone, ArgNone, ArgNone, ArgNone }},
++        {ArgULong, ArgULong, ArgAttribute|ArgArray, ArgULong, ArgNone,
++         ArgNone, ArgNone, ArgNone, ArgNone, ArgNone }},
+     {"C_SetAttributeValue", F_C_SetAttributeValue,
+ "C_SetAttributeValue hSession hObject pTemplate ulCount\n\n"
+ "C_SetAttributeValue modifies the value of one or more object attributes\n"
+@@ -1375,7 +1379,17 @@ const Commands _commands[] = {
+     {"Quit", F_Quit,
+ "Exit from this program",
+ 	{ArgNone, ArgNone, ArgNone, ArgNone, ArgNone,
+-	 ArgNone, ArgNone, ArgNone, ArgNone, ArgNone }},
++         ArgNone, ArgNone, ArgNone, ArgNone, ArgNone }},
++/* GOST_89_94_2001 */
++{"C_GetDBPrivateKey", F_C_GetDBPrivateKey,
++"C_GetDBPrivateKey hSession hObject ppDerPK\n\n"
++"C_GetDBPrivateKey obtains the private key in DER format.\n"
++" hSession     the session's handle\n"
++" hObject      the object's handle\n"
++" ppDerPK      the private key\n",
++        {ArgULong, ArgULong, ArgItem, ArgNone, ArgNone,
++         ArgNone, ArgNone, ArgNone, ArgNone, ArgNone }}
++/* GOST_89_94_2001 */
+ };
+ 
+ const Commands  *commands= &_commands[0];
+diff --git a/security/nss/cmd/lib/pk11table.h b/security/nss/cmd/lib/pk11table.h
+index 35ce1a2..3454f9e 100644
+--- a/security/nss/cmd/lib/pk11table.h
++++ b/security/nss/cmd/lib/pk11table.h
+@@ -95,6 +95,9 @@ typedef enum {
+     ArgMechanismInfo,
+     ArgInitializeArgs,
+     ArgFunctionList,
++    /* GOST_89_94_2001 */
++    ArgItem,
++    /* GOST_89_94_2001 */
+ /* Modifier Flags */
+     ArgMask = 0xff,
+     ArgOut = 0x100,
+diff --git a/security/nss/cmd/lib/secutil.c b/security/nss/cmd/lib/secutil.c
+index e9059b4..cc9d1be 100644
+--- a/security/nss/cmd/lib/secutil.c
++++ b/security/nss/cmd/lib/secutil.c
+@@ -1751,6 +1751,8 @@ secu_PrintSubjectPublicKeyInfo(FILE *out, PRArenaPool *arena,
+ 	    SECU_Indent(out, level);
+     	    fprintf(out, "unable to format this SPKI algorithm type\n");
+ 	    goto loser;
++        /* GOST_89_94_2001 */
++        /*case gostKey:*/
+ 	default:
+ 	    SECU_Indent(out, level);
+ 	    fprintf(out, "unknown SPKI algorithm type\n");
+diff --git a/security/nss/cmd/pk11util/pk11util.c b/security/nss/cmd/pk11util/pk11util.c
+index fc84a2a..d19977f 100644
+--- a/security/nss/cmd/pk11util/pk11util.c
++++ b/security/nss/cmd/pk11util/pk11util.c
+@@ -886,6 +886,11 @@ ArgSize(ArgType type)
+     	case ArgAttribute:
+ 	    size = sizeof(CK_ATTRIBUTE);
+ 	    break;
++        /* GOST_89_94_2001 */
++        case ArgItem:
++            size = sizeof(CK_ITEM_PTR_PTR);
++            break;
++        /* GOST_89_94_2001 */
+     	case ArgMechanism:
+ 	    size = sizeof(CK_MECHANISM);
+ 	    break;
+@@ -987,6 +992,9 @@ printArg(Value *ptr,int arg_number)
+     CK_ATTRIBUTE    *attribute;
+     CK_MECHANISM    *mechanism;
+     CK_MECHANISM_INFO    *mechanismInfo;
++    /* GOST_89_94_2001 */
++    CK_ITEM_PTR_PTR *item;
++    /* GOST_89_94_2001 */
+     CK_C_INITIALIZE_ARGS *initArgs;
+     CK_FUNCTION_LIST *functionList;
+     CK_RV ckrv = CKR_OK;
+@@ -1137,6 +1145,21 @@ printArg(Value *ptr,int arg_number)
+ 	    }
+ 	}
+ 	break;
++    /* GOST_89_94_2001 */
++    case ArgItem:
++        item = (CK_ITEM_PTR_PTR *)ptr->data;
++        printf(" Item: ");
++        printConst((**item)->type, ConstAttribute, 1);
++        printf(" Item Data: ");
++        if ((**item)->data == NULL) {
++             printf("NULL\n");
++             printf("Item Len: %lu\n", (**item)->len);
++         } else {
++             printf("\n");
++             printDump((**item)->data, (**item)->len);
++         }
++      break;
++    /* GOST_89_94_2001 */
+     case ArgMechanism:
+ 	mechanism = (CK_MECHANISM *)ptr->data;
+ 	printf(" Mechanism Type: ");
+@@ -1366,6 +1389,9 @@ parseArgs(int index, const char * bp)
+     	case ArgInitializeArgs:
+ 	case ArgUTF8:
+ 	case ArgChar:
++        /* GOST_89_94_2001 */
++        case ArgItem:
++        /* GOST_89_94_2001 */
+ 	     bp = readChars(bp,(char *)argList[i]->data,argList[i]->size);
+     	case ArgNone:
+ 	default:
+@@ -2050,6 +2076,13 @@ do_func(int index, Value **a)
+ 	return quitIf(*(CK_ULONG *)a[0]->data,a[1]->data,*(CK_ULONG *)a[2]->data);
+     case F_Quit:
+ 	return CKR_QUIT;
++    /* GOST_89_94_2001 */
++    case F_C_GetDBPrivateKey:
++        if (!func) return CKR_CRYPTOKI_NOT_INITIALIZED;
++        return func->C_GetDBPrivateKey(*(CK_SESSION_HANDLE *)a[0]->data,
++                                       *(CK_OBJECT_HANDLE *)a[1]->data,
++                                       (CK_ITEM_PTR_PTR *)a[2]->data);
++    /* GOST_89_94_2001 */
+     default:
+ 	fprintf(stderr,
+ 		"Function %s not yet supported\n",commands[index].fname );
+diff --git a/security/nss/cmd/vfyserv/vfyserv.c b/security/nss/cmd/vfyserv/vfyserv.c
+index 84ee69e..6486fa6 100644
+--- a/security/nss/cmd/vfyserv/vfyserv.c
++++ b/security/nss/cmd/vfyserv/vfyserv.c
+@@ -177,9 +177,9 @@ setupSSLSocket(PRNetAddr *addr)
+ 	}
+ 
+ 	/* Set SSL callback routines. */
+-	secStatus = SSL_GetClientAuthDataHook(sslSocket,
++        secStatus = SSL_GetClientAuthDataHook(sslSocket,
+ 	                          (SSLGetClientAuthData)myGetClientAuthData,
+-	                          (void *)certNickname);
++                                  (void *)certNickname);
+ 	if (secStatus != SECSuccess) {
+ 		errWarn("SSL_GetClientAuthDataHook");
+ 		goto loser;
+diff --git a/security/nss/lib/certdb/alg1485.c b/security/nss/lib/certdb/alg1485.c
+index 5fc2029..e0d183d 100644
+--- a/security/nss/lib/certdb/alg1485.c
++++ b/security/nss/lib/certdb/alg1485.c
+@@ -1119,7 +1119,7 @@ CERT_NameToAsciiInvertible(CERTName *name, CertStrictnessLevel strict)
+ 	 * XXX Do we need to traverse the AVAs in reverse order, too?
+ 	 */
+ 	while (avas && (ava = *avas++) != NULL) {
+-	    SECStatus rv;
++            SECStatus rv;
+ 	    /* Put in comma or plus separator */
+ 	    if (!first) {
+ 		/* Use of spaces is deprecated in RFC 2253. */
+diff --git a/security/nss/lib/certdb/certdb.c b/security/nss/lib/certdb/certdb.c
+index 481b64b..a103109 100644
+--- a/security/nss/lib/certdb/certdb.c
++++ b/security/nss/lib/certdb/certdb.c
+@@ -1352,6 +1352,8 @@ CERT_CheckKeyUsage(CERTCertificate *cert, unsigned int requiredUsage)
+ 	    if (!(cert->keyUsage & (KU_DIGITAL_SIGNATURE | KU_KEY_AGREEMENT)))
+ 		 goto loser;
+ 	    break;
++        /* GOST_89_94_2001 */
++        /*case gostKey:*/
+ 	default:
+ 	    goto loser;
+ 	}
+diff --git a/security/nss/lib/certhigh/certvfy.c b/security/nss/lib/certhigh/certvfy.c
+index 40c569f..d8dc378 100644
+--- a/security/nss/lib/certhigh/certvfy.c
++++ b/security/nss/lib/certhigh/certvfy.c
+@@ -634,7 +634,7 @@ cert_VerifyCertChainOld(CERTCertDBHandle *handle, CERTCertificate *cert,
+ 	}
+ 
+ 	/* find the certificate of the issuer */
+-	issuerCert = CERT_FindCertIssuer(subjectCert, t, certUsage);
++        issuerCert = CERT_FindCertIssuer(subjectCert, t, certUsage);
+ 	if ( ! issuerCert ) {
+ 	    PORT_SetError(SEC_ERROR_UNKNOWN_ISSUER);
+ 	    LOG_ERROR(log,subjectCert,count,0);
+diff --git a/security/nss/lib/ckfw/ck.api b/security/nss/lib/ckfw/ck.api
+index ec31370..bd07233 100644
+--- a/security/nss/lib/ckfw/ck.api
++++ b/security/nss/lib/ckfw/ck.api
+@@ -573,3 +573,11 @@ CK_VOID_PTR    pRserved # reserved.  Should be NULL_PTR
+ #CK_SLOT_ID slotID      # the slot to configure 
+ #CK_BYTE_PTR pConfig    # the configuration string 
+ #CK_ULONG ulConfigLen   # length of the config string 
++
++# GOST_89_94_2001 
++# C_GetDBPrivateKey obtains the private key in DER format. 
++FUNCTION C_GetDBPrivateKey
++CK_SESSION_HANDLE hSession    # the session's handle 
++CK_OBJECT_HANDLE  hObject     # the object's handle 
++CK_ITEM_PTR_PTR   ppDerPK     # the private key 
++# GOST_89_94_2001 
+diff --git a/security/nss/lib/ckfw/nssck.api b/security/nss/lib/ckfw/nssck.api
+index 3c00c72..9e910cc 100644
+--- a/security/nss/lib/ckfw/nssck.api
++++ b/security/nss/lib/ckfw/nssck.api
+@@ -1788,6 +1788,32 @@ C_WaitForSlotEvent
+ }
+ #endif /* DECLARE_STRICT_CRYPTOKI_NAMES */
+ 
++/* GOST_89_94_2001 */
++static CK_RV CK_ENTRY
++__ADJOIN(MODULE_NAME,C_GetDBPrivateKey)
++(
++  CK_SESSION_HANDLE hSession,
++  CK_OBJECT_HANDLE  hObject,
++  CK_ITEM_PTR_PTR   ppDerPK
++)
++{
++  return NSSCKFWC_GetDBPrivateKey(fwInstance, hSession, hObject, ppDerPK);
++}
++
++#ifdef DECLARE_STRICT_CRYPTOKI_NAMES
++CK_RV CK_ENTRY
++C_GetDBPrivateKey
++(
++  CK_SESSION_HANDLE hSession,
++  CK_OBJECT_HANDLE  hObject,
++  CK_ITEM_PTR_PTR   ppDerPK
++)
++{
++  return __ADJOIN(MODULE_NAME,C_GetDBPrivateKey)(hSession, hObject, ppDerPK);
++}
++#endif /* DECLARE_STRICT_CRYPTOKI_NAMES */
++/* GOST_89_94_2001 */
++
+ static CK_RV CK_ENTRY
+ __ADJOIN(MODULE_NAME,C_GetFunctionList)
+ (
+@@ -1863,7 +1889,10 @@ __ADJOIN(MODULE_NAME,C_SeedRandom),
+ __ADJOIN(MODULE_NAME,C_GenerateRandom),
+ __ADJOIN(MODULE_NAME,C_GetFunctionStatus),
+ __ADJOIN(MODULE_NAME,C_CancelFunction),
+-__ADJOIN(MODULE_NAME,C_WaitForSlotEvent)
++__ADJOIN(MODULE_NAME,C_WaitForSlotEvent),
++/* GOST_89_94_2001 */
++__ADJOIN(MODULE_NAME,C_GetDBPrivateKey)
++/* GOST_89_94_2001 */
+ };
+ 
+ static CK_RV CK_ENTRY
+diff --git a/security/nss/lib/ckfw/nssckfwc.h b/security/nss/lib/ckfw/nssckfwc.h
+index 089e73f..605e258 100644
+--- a/security/nss/lib/ckfw/nssckfwc.h
++++ b/security/nss/lib/ckfw/nssckfwc.h
+@@ -133,6 +133,7 @@ static const char NSSCKFWC_CVS_ID[] = "@(#) $RCSfile: nssckfwc.h,v $ $Revision:
+  * NSSCKFWC_GenerateRandom
+  * NSSCKFWC_GetFunctionStatus
+  * NSSCKFWC_CancelFunction
++ * NSSCKFWC_GetDBPrivateKey
+  */
+ 
+ /*
+@@ -476,6 +477,21 @@ NSSCKFWC_SetAttributeValue
+   CK_ULONG ulCount
+ );
+ 
++/* GOST_89_94_2001 */
++/*
++ * NSSCKFWC_GetDBPrivateKey
++ *
++ */
++NSS_EXTERN CK_RV
++NSSCKFWC_GetDBPrivateKey
++(
++  NSSCKFWInstance *fwInstance,
++  CK_SESSION_HANDLE hSession,
++  CK_OBJECT_HANDLE  hObject,
++  CK_ITEM_PTR_PTR   ppDerPK
++);
++/* GOST_89_94_2001 */
++
+ /*
+  * NSSCKFWC_FindObjectsInit
+  *
+diff --git a/security/nss/lib/ckfw/wrap.c b/security/nss/lib/ckfw/wrap.c
+index 886d255..ade19ed 100644
+--- a/security/nss/lib/ckfw/wrap.c
++++ b/security/nss/lib/ckfw/wrap.c
+@@ -123,6 +123,7 @@ static const char CVS_ID[] = "@(#) $RCSfile: wrap.c,v $ $Revision: 1.18 $ $Date:
+  * NSSCKFWC_GenerateRandom
+  * NSSCKFWC_GetFunctionStatus
+  * NSSCKFWC_CancelFunction
++ * NSSCKFWC_GetDBPrivateKey
+  */
+ 
+ /* figure out out locking semantics */
+@@ -5703,3 +5704,22 @@ NSSCKFWC_CancelFunction
+ {
+   return CKR_FUNCTION_NOT_PARALLEL;
+ }
++
++/* GOST_89_94_2001 */
++/*
++ * NSSCKFWC_GetDBPrivateKey
++ *
++ */
++NSS_IMPLEMENT CK_RV
++NSSCKFWC_GetDBPrivateKey
++(
++  NSSCKFWInstance *fwInstance,
++  CK_SESSION_HANDLE hSession,
++  CK_OBJECT_HANDLE  hObject,
++  CK_ITEM_PTR_PTR   ppDerPK
++)
++{
++    printf("NSSCKFWC_GetDBPrivateKey - not implemented\n");
++    return CKR_GENERAL_ERROR;
++}
++/* GOST_89_94_2001 */
+diff --git a/security/nss/lib/crmf/crmfcont.c b/security/nss/lib/crmf/crmfcont.c
+index 3f096f5..ad3361f 100644
+--- a/security/nss/lib/crmf/crmfcont.c
++++ b/security/nss/lib/crmf/crmfcont.c
+@@ -612,6 +612,8 @@ crmf_get_public_value(SECKEYPublicKey *pubKey, SECItem *dest)
+     case dhKey:
+ 	src =  &pubKey->u.dh.publicValue;
+ 	break;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	src = NULL;
+ 	break;
+@@ -739,6 +741,9 @@ crmf_encrypted_value_unwrap_priv_key(PRArenaPool        *poolp,
+         usage = dsaUsage;
+         usageCount = sizeof(dsaUsage)/sizeof(dsaUsage[0]);
+         break;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
++    /*    break;*/
+     }
+     PORT_Assert(usage != NULL);
+     PORT_Assert(usageCount != 0);
+diff --git a/security/nss/lib/cryptohi/keythi.h b/security/nss/lib/cryptohi/keythi.h
+index cd55b05..8f41bf3 100644
+--- a/security/nss/lib/cryptohi/keythi.h
++++ b/security/nss/lib/cryptohi/keythi.h
+@@ -49,7 +49,9 @@ typedef enum {
+     fortezzaKey = 3,
+     dhKey = 4, 
+     keaKey = 5,
+-    ecKey = 6
++    ecKey = 6,
++    /* GOST_89_94_2001 */
++    gostKey = 7
+ } KeyType;
+ 
+ /*
+@@ -183,6 +185,22 @@ struct SECKEYKEAPublicKeyStr {
+ };
+ typedef struct SECKEYKEAPublicKeyStr SECKEYKEAPublicKey;
+ 
++/* GOST_89_94_2001 */
++struct SECKEYGOSTParamsStr {
++    PLArenaPool *arena;
++    SECItem paramSet2001;
++    SECItem paramSet94;
++};
++
++typedef struct SECKEYGOSTParamsStr SECKEYGOSTParams;
++
++struct SECKEYGOSTPublicKeyStr {
++    SECKEYGOSTParams params;
++    SECItem publicValue;
++};
++
++typedef struct SECKEYGOSTPublicKeyStr SECKEYGOSTPublicKey;
++
+ /*
+ ** A Generic  public key object.
+ */
+@@ -198,6 +216,8 @@ struct SECKEYPublicKeyStr {
+         SECKEYKEAPublicKey kea;
+         SECKEYFortezzaPublicKey fortezza;
+ 	SECKEYECPublicKey  ec;
++        /* GOST_89_94_2001 */
++        SECKEYGOSTPublicKey gost;
+     } u;
+ };
+ typedef struct SECKEYPublicKeyStr SECKEYPublicKey;
+diff --git a/security/nss/lib/cryptohi/seckey.c b/security/nss/lib/cryptohi/seckey.c
+index b1ddf93..6db4bc2 100644
+--- a/security/nss/lib/cryptohi/seckey.c
++++ b/security/nss/lib/cryptohi/seckey.c
+@@ -146,6 +146,15 @@ const SEC_ASN1Template SECKEY_KEAParamsTemplate[] = {
+     { 0, }
+ };
+ 
++/* GOST_89_94_2001 */
++const SEC_ASN1Template SECKEY_GOSTParamsTemplate[] = {
++    { SEC_ASN1_SEQUENCE, 0, NULL, sizeof(SECKEYGOSTParams) },
++    { SEC_ASN1_OBJECT_ID, offsetof(SECKEYGOSTParams,paramSet2001) },
++    { SEC_ASN1_OBJECT_ID, offsetof(SECKEYGOSTParams,paramSet94) },
++    { 0, }
++};
++
++
+ SEC_ASN1_CHOOSER_IMPLEMENT(SECKEY_DSAPublicKeyTemplate)
+ SEC_ASN1_CHOOSER_IMPLEMENT(SECKEY_RSAPublicKeyTemplate)
+ SEC_ASN1_CHOOSER_IMPLEMENT(CERT_SubjectPublicKeyInfoTemplate)
+@@ -192,6 +201,14 @@ prepare_kea_pub_key_for_asn1(SECKEYPublicKey *pubk)
+ {
+     pubk->u.kea.publicValue.type = siUnsignedInteger;
+ }
++/* GOST_89_94_2001 */
++static void
++prepare_gost_params_for_asn1(SECKEYGOSTParams *params)
++{
++    params->paramSet2001.type = siUnsignedInteger;
++    params->paramSet94.type = siUnsignedInteger;
++}
++/* GOST_89_94_2001 */
+ 
+ /* Create an RSA key pair is any slot able to do so.
+ ** The created keys are "session" (temporary), not "token" (permanent), 
+@@ -1137,6 +1154,18 @@ seckey_ExtractPublicKey(CERTSubjectPublicKeyInfo *spki)
+ 	if (rv == SECSuccess) return pubk;
+ 	break;
+ 
++      /* GOST_89_94_2001 */
++      case SEC_OID_PKCS7_GOSTR3410_2001:
++        pubk->keyType = gostKey;
++
++        prepare_gost_params_for_asn1(&pubk->u.gost.params);
++        rv = SEC_QuickDERDecodeItem(arena, &pubk->u.gost.params, SECKEY_GOSTParamsTemplate,
++                                 &spki->algorithm.parameters);
++        if ( rv != SECSuccess )
++            break;
++        rv = SECITEM_CopyItem(arena, &pubk->u.gost.publicValue, &newOs);
++        if (rv == SECSuccess) return pubk;
++
+       default:
+ 	rv = SECFailure;
+ 	break;
+@@ -1485,6 +1514,8 @@ SECKEY_PublicKeyStrength(const SECKEYPublicKey *pubk)
+ 	/* Get the key size in bits and adjust */
+ 	size =	SECKEY_ECParamsToKeySize(&pubk->u.ec.DEREncodedParams);
+ 	return (size + 7)/8;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	break;
+     }
+@@ -1506,6 +1537,8 @@ SECKEY_PublicKeyStrengthInBits(const SECKEYPublicKey *pubk)
+     case ecKey:
+ 	size = SECKEY_ECParamsToKeySize(&pubk->u.ec.DEREncodedParams);
+ 	return size;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	break;
+     }
+@@ -1532,6 +1565,8 @@ SECKEY_SignatureLen(const SECKEYPublicKey *pubk)
+ 	size =	SECKEY_ECParamsToBasePointOrderLen(
+ 		&pubk->u.ec.DEREncodedParams);
+ 	return ((size + 7)/8) * 2;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	break;
+     }
+@@ -1702,6 +1737,8 @@ SECKEY_CopyPublicKey(const SECKEYPublicKey *pubk)
+           break;
+       case nullKey:
+           return copyk;
++      /* GOST_89_94_2001 */
++      /*case gostKey:*/
+       default:
+           rv = SECFailure;
+           break;
+@@ -1770,6 +1807,8 @@ SECKEY_ConvertToPublicKey(SECKEYPrivateKey *privk)
+ 	if (rv != SECSuccess)  break;
+ 	return pubk;
+ 	break;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	break;
+     }
+@@ -1918,6 +1957,8 @@ SECKEY_CreateSubjectPublicKeyInfo(SECKEYPublicKey *pubk)
+ 	    }
+ #endif
+ 	    break;
++          /* GOST_89_94_2001 */
++          /*case gostKey:*/
+ 	  default:
+ 	    break;
+ 	}
+@@ -2341,6 +2382,7 @@ SECKEY_ImportDERPublicKey(SECItem *derKey, CK_KEY_TYPE type)
+         rv = SEC_QuickDERDecodeItem(pubk->arena, pubk, SECKEY_DHPublicKeyTemplate, &newDerKey);
+         pubk->keyType = dhKey;
+         break;
++      /* GOST_89_94_2001 */
+       default:
+         rv = SECFailure;
+         break;
+diff --git a/security/nss/lib/cryptohi/secsign.c b/security/nss/lib/cryptohi/secsign.c
+index 0ca2ee2..21a6c9f 100644
+--- a/security/nss/lib/cryptohi/secsign.c
++++ b/security/nss/lib/cryptohi/secsign.c
+@@ -364,6 +364,8 @@ SEC_DerSignData(PRArenaPool *arena, SECItem *result,
+ 	  case ecKey:
+ 	    algID = SEC_OID_ANSIX962_ECDSA_SIGNATURE_WITH_SHA1_DIGEST;
+ 	    break;
++          /* GOST_89_94_2001 */
++          /*case gostKey:*/
+ 	  default:
+ 	    PORT_SetError(SEC_ERROR_INVALID_KEY);
+ 	    return SECFailure;
+@@ -511,6 +513,8 @@ SEC_GetSignatureAlgorithmOidTag(KeyType keyType, SECOidTag hashAlgTag)
+ 	default:
+ 	break;
+ 	}
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+     	break;
+     }
+diff --git a/security/nss/lib/cryptohi/secvfy.c b/security/nss/lib/cryptohi/secvfy.c
+index fd1ffb7..e9d48ec 100644
+--- a/security/nss/lib/cryptohi/secvfy.c
++++ b/security/nss/lib/cryptohi/secvfy.c
+@@ -415,6 +415,8 @@ vfy_CreateContext(const SECKEYPublicKey *key, const SECItem *sig,
+ 	    }
+ 	    rv = decodeECorDSASignature(encAlg, sig, cx->u.buffer, sigLen);
+  	    break;
++        /* GOST_89_94_2001 */
++        /*case gostKey:*/
+ 	default:
+ 	    rv = SECFailure;
+ 	    PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+@@ -581,6 +583,8 @@ VFY_EndWithSignature(VFYContext *cx, SECItem *sig)
+ 	    return SECFailure;
+ 	}
+ 	break;
++      /* GOST_89_94_2001 */
++      /*case gostKey:*/
+       default:
+ 	PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+ 	return SECFailure; /* shouldn't happen */
+@@ -634,6 +638,8 @@ vfy_VerifyDigest(const SECItem *digest, const SECKEYPublicKey *key,
+ 		rv = SECSuccess;
+ 	    }
+ 	    break;
++        /* GOST_89_94_2001 */
++        /*case gostKey:*/
+ 	default:
+ 	    break;
+ 	}
+diff --git a/security/nss/lib/freebl/blapit.h b/security/nss/lib/freebl/blapit.h
+index 704f514..1141b88 100644
+--- a/security/nss/lib/freebl/blapit.h
++++ b/security/nss/lib/freebl/blapit.h
+@@ -371,6 +371,31 @@ struct ECPrivateKeyStr {
+ };
+ typedef struct ECPrivateKeyStr ECPrivateKey;
+ 
++/* GOST_89_94_2001 */
++struct GOSTParamsStr {
++    PLArenaPool *arena;
++    SECItem paramSet2001;
++    SECItem paramSet94;
++};
++
++typedef struct GOSTParamsStr GOSTParams;
++
++struct GOSTPublicKeyStr {
++    GOSTParams params;
++    SECItem publicValue;
++};
++
++typedef struct GOSTPublicKeyStr GOSTPublicKey;
++
++struct GOSTPrivateKeyStr {
++    GOSTParams params;
++    SECItem privateValue;
++    SECItem publicValue; /* this field needs only for nsslowkey_ConvertToPublicKey: privKey converts to pubKey */
++};
++
++typedef struct GOSTPrivateKeyStr GOSTPrivateKey;
++/* GOST_89_94_2001 */
++
+ typedef void * (*BLapiAllocateFunc)(void);
+ typedef void (*BLapiDestroyContextFunc)(void *cx, PRBool freeit);
+ typedef SECStatus (*BLapiInitContextFunc)(void *cx, 
+diff --git a/security/nss/lib/manifest.mn b/security/nss/lib/manifest.mn
+index 935c2cc..f294ae6 100644
+--- a/security/nss/lib/manifest.mn
++++ b/security/nss/lib/manifest.mn
+@@ -52,8 +52,8 @@ DIRS =  util freebl softoken \
+ 	base dev pki pki1 \
+ 	libpkix \
+ 	certdb certhigh pk11wrap cryptohi nss \
+-	ssl \
+ 	pkcs12 pkcs7 smime \
++	ssl \
+ 	crmf jar \
+ 	ckfw      \
+ 	$(NULL)
+diff --git a/security/nss/lib/nss/nss.def b/security/nss/lib/nss/nss.def
+index f72174f..af4aa62 100644
+--- a/security/nss/lib/nss/nss.def
++++ b/security/nss/lib/nss/nss.def
+@@ -1,3 +1,4 @@
++
+ ;+#
+ ;+# ***** BEGIN LICENSE BLOCK *****
+ ;+# Version: MPL 1.1/GPL 2.0/LGPL 2.1
+@@ -123,6 +124,9 @@ PK11_FindCertByIssuerAndSN;
+ PK11_FindKeyByAnyCert;
+ PK11_FindKeyByDERCert;
+ PK11_FindSlotByName;
++;+# GOST_89_94_2001
++PK11_GetDBPrivateKey;
++;+# GOST_89_94_2001
+ PK11_Finalize;
+ PK11_FortezzaHasKEA;
+ PK11_FreeSlot;
+diff --git a/security/nss/lib/pk11wrap/debug_module.c b/security/nss/lib/pk11wrap/debug_module.c
+index 5197d96..ecb70c7 100644
+--- a/security/nss/lib/pk11wrap/debug_module.c
++++ b/security/nss/lib/pk11wrap/debug_module.c
+@@ -566,6 +566,9 @@ static void print_mechanism(CK_MECHANISM_PTR m)
+     CASE(CKM_X9_42_DH_PARAMETER_GEN);
+     CASE(CKM_X9_42_MQV_DERIVE);
+     CASE(CKM_XOR_BASE_AND_DATA);
++    /* GOST_89_94_2001 */
++    /*CASE(CKM_GOSTR3410_2001);
++    CASE(CKM_GOSTR3411_94_WITH_GOSTR3410_2001);*/
+     default: break;
+     }
+     if (a)
+@@ -889,7 +892,11 @@ struct nssdbg_prof_str nssdbg_prof_data[] = {
+ #define FUNC_C_CANCELFUNCTION 66
+     NSSDBG_DEFINE(C_CancelFunction),
+ #define FUNC_C_WAITFORSLOTEVENT 67
+-    NSSDBG_DEFINE(C_WaitForSlotEvent)
++    NSSDBG_DEFINE(C_WaitForSlotEvent),
++/* GOST_89_94_2001 */
++#define FUNC_C_GETDBPRIVATEKEY 68
++    NSSDBG_DEFINE(C_GetDBPrivateKey)
++/* GOST_89_94_2001 */
+ };
+ 
+ int nssdbg_prof_size = sizeof(nssdbg_prof_data)/sizeof(nssdbg_prof_data[0]);
+@@ -2560,6 +2567,18 @@ CK_RV NSSDBGC_WaitForSlotEvent(
+     return rv;
+ }
+ 
++/* GOST_89_94_2001 */
++CK_RV NSSDBGC_GetDBPrivateKey(
++  CK_SESSION_HANDLE hSession,
++  CK_OBJECT_HANDLE  hObject,
++  CK_ITEM_PTR_PTR   ppDerPK
++)
++{
++    printf("NSSDBGC_GetDBPrivateKey - not implemented\n");
++    return CKR_GENERAL_ERROR;
++}
++/* GOST_89_94_2001 */
++
+ CK_FUNCTION_LIST_PTR nss_InsertDeviceLog(
+   CK_FUNCTION_LIST_PTR devEPV
+ )
+@@ -2634,6 +2653,9 @@ CK_FUNCTION_LIST_PTR nss_InsertDeviceLog(
+     debug_functions.C_GetFunctionStatus = NSSDBGC_GetFunctionStatus;
+     debug_functions.C_CancelFunction = NSSDBGC_CancelFunction;
+     debug_functions.C_WaitForSlotEvent = NSSDBGC_WaitForSlotEvent;
++    /* GOST_89_94_2001 */
++    debug_functions.C_GetDBPrivateKey = NSSDBGC_GetDBPrivateKey;
++    /* GOST_89_94_2001 */
+     return &debug_functions;
+ }
+ 
+diff --git a/security/nss/lib/pk11wrap/pk11akey.c b/security/nss/lib/pk11wrap/pk11akey.c
+index 47f48d6..7768425 100644
+--- a/security/nss/lib/pk11wrap/pk11akey.c
++++ b/security/nss/lib/pk11wrap/pk11akey.c
+@@ -77,6 +77,10 @@ pk11_MakeIDFromPublicKey(SECKEYPublicKey *pubKey)
+     case ecKey:
+       pubKeyIndex = &pubKey->u.ec.publicValue;
+       break;      
++    /* GOST_89_94_2001 */
++    case gostKey:
++      pubKeyIndex = &pubKey->u.gost.publicValue;
++      break;
+     default:
+       return NULL;
+     }
+@@ -103,7 +107,9 @@ PK11_ImportPublicKey(PK11SlotInfo *slot, SECKEYPublicKey *pubKey,
+     CK_OBJECT_CLASS keyClass = CKO_PUBLIC_KEY;
+     CK_KEY_TYPE keyType = CKK_GENERIC_SECRET;
+     CK_OBJECT_HANDLE objectID;
+-    CK_ATTRIBUTE theTemplate[11];
++    /* GOST_89_94_2001 */
++    /*CK_ATTRIBUTE theTemplate[11];*/
++    CK_ATTRIBUTE theTemplate[25];
+     CK_ATTRIBUTE *signedattr = NULL;
+     CK_ATTRIBUTE *attrs = theTemplate;
+     SECItem *ckaId = NULL;
+@@ -222,6 +228,19 @@ PK11_ImportPublicKey(PK11SlotInfo *slot, SECKEYPublicKey *pubKey,
+ 			  pubValue->data, pubValue->len); attrs++;
+ 	    }
+ 	    break;
++        /* GOST_89_94_2001 */
++        case gostKey:
++            keyType = CKK_GOST;
++            PK11_SETATTRS(attrs, CKA_VERIFY, &cktrue, sizeof(CK_BBOOL));attrs++;
++            PK11_SETATTRS(attrs, CKA_DERIVE, &cktrue, sizeof(CK_BBOOL));attrs++;
++            signedattr = attrs;
++            PK11_SETATTRS(attrs, CKA_GOST_PARAMSET2001, pubKey->u.gost.params.paramSet2001.data,
++                                pubKey->u.gost.params.paramSet2001.len); attrs++;
++            PK11_SETATTRS(attrs, CKA_GOST_PARAMSET94, pubKey->u.gost.params.paramSet94.data,
++                                        pubKey->u.gost.params.paramSet94.len); attrs++;
++            PK11_SETATTRS(attrs, CKA_VALUE, pubKey->u.gost.publicValue.data,
++                                        pubKey->u.gost.publicValue.len); attrs++;
++            break;
+ 	default:
+ 	    PORT_SetError( SEC_ERROR_BAD_KEY );
+ 	    return CK_INVALID_HANDLE;
+@@ -609,6 +628,10 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot,KeyType keyType,CK_OBJECT_HANDLE id)
+ 	case CKK_EC:
+ 	    keyType = ecKey;
+ 	    break;
++        /* GOST_89_94_2001 */
++        /*case CKK_GOST:*/
++        /*    keyType = gostKey;*/
++        /*    break;*/
+ 	default:
+ 	    PORT_SetError( SEC_ERROR_BAD_KEY );
+ 	    return NULL;
+@@ -738,6 +761,8 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot,KeyType keyType,CK_OBJECT_HANDLE id)
+ 	break;
+     case fortezzaKey:
+     case nullKey:
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	crv = CKR_OBJECT_HANDLE_INVALID;
+ 	break;
+@@ -779,6 +804,8 @@ PK11_MakePrivKey(PK11SlotInfo *slot, KeyType keyType,
+ 	case CKK_DH: keyType = dhKey; break;
+ 	case CKK_KEA: keyType = fortezzaKey; break;
+ 	case CKK_EC: keyType = ecKey; break;
++        /* GOST_89_94_2001 */
++        case CKK_GOST: keyType = gostKey; break;
+ 	default:
+ 		break;
+ 	}
+@@ -853,6 +880,8 @@ PK11_GetPrivateModulusLen(SECKEYPrivateKey *key)
+     case fortezzaKey:
+     case dsaKey:
+     case dhKey:
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	break;
+     }
+@@ -862,7 +891,29 @@ PK11_GetPrivateModulusLen(SECKEYPrivateKey *key)
+     return -1;
+ }
+ 
++/* GOST_89_94_2001 */
++CK_ITEM_PTR
++PK11_GetDBPrivateKey(PK11SlotInfo *slot, CK_OBJECT_HANDLE privID)
++{
++    PORT_Assert(slot->session != CK_INVALID_SESSION);
++    if (slot->session == CK_INVALID_SESSION) {
++        return NULL;
++    }
++
++    PK11_EnterSlotMonitor(slot);
++
++    CK_ITEM_PTR derPK = NULL, tmpPK;
++
++    CK_RV rv = PK11_GETTAB(slot)->C_GetDBPrivateKey(slot->session, privID, &tmpPK);
++    if (rv == CKR_OK) {
++        derPK = tmpPK;
++    }
++
++    PK11_ExitSlotMonitor(slot);
+ 
++    return derPK;
++}
++/* GOST_89_94_2001 */
+ 
+ /*
+  * take a private key in one pkcs11 module and load it into another:
+@@ -960,6 +1011,14 @@ pk11_loadPrivKeyWithFlags(PK11SlotInfo *slot,SECKEYPrivateKey *privKey,
+ 	ap->type = CKA_DERIVE; ap++; count++; extra_count++;
+ 	ap->type = CKA_SIGN; ap++; count++; extra_count++;
+ 	break;
++     /* GOST_89_94_2001 */
++     case gostKey:
++        ap->type = CKA_GOST_PARAMSET2001; ap++; count++; extra_count++;
++        ap->type = CKA_GOST_PARAMSET94; ap++; count++; extra_count++;
++        ap->type = CKA_VALUE; ap++; count++; extra_count++;
++        ap->type = CKA_DERIVE; ap++; count++; extra_count++;
++        ap->type = CKA_SIGN; ap++; count++; extra_count++;
++        break;
+      default:
+ 	count = 0;
+ 	extra_count = 0;
+@@ -1013,8 +1072,8 @@ pk11_loadPrivKeyWithFlags(PK11SlotInfo *slot,SECKEYPrivateKey *privKey,
+      }
+ 
+      /* build new key structure */
+-     return PK11_MakePrivKey(slot, privKey->keyType, !token, 
+-						objectID, privKey->wincx);
++     return PK11_MakePrivKey(slot, privKey->keyType, !token,
++                                                objectID, privKey->wincx);
+ }
+ 
+ static SECKEYPrivateKey *
+@@ -1311,6 +1370,7 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot,CK_MECHANISM_TYPE type,
+ 	    test_mech2.mechanism = CKM_ECDSA;
+ 	}
+         break;
++    /* GOST_89_94_2001 */
+     default:
+ 	PORT_SetError( SEC_ERROR_BAD_KEY );
+ 	return NULL;
+@@ -1588,6 +1648,8 @@ PK11_ImportEncryptedPrivateKeyInfo(PK11SlotInfo *slot,
+     CK_ATTRIBUTE_TYPE dsaUsage[] = { CKA_SIGN };
+     CK_ATTRIBUTE_TYPE dhUsage[] = { CKA_DERIVE };
+     CK_ATTRIBUTE_TYPE ecUsage[] = { CKA_SIGN, CKA_DERIVE };
++    /* GOST_89_94_2001 */
++    CK_ATTRIBUTE_TYPE gostUsage[] = { CKA_SIGN, CKA_DERIVE };
+     if((epki == NULL) || (pwitem == NULL))
+ 	return SECFailure;
+ 
+@@ -1642,6 +1704,25 @@ PK11_ImportEncryptedPrivateKeyInfo(PK11SlotInfo *slot,
+ 	    break;
+ 	}
+ 	break;	
++    /* GOST_89_94_2001 */
++    case gostKey:
++        key_type = CKK_GOST;
++        switch  (keyUsage & (KU_DIGITAL_SIGNATURE|KU_KEY_AGREEMENT)) {
++        case KU_DIGITAL_SIGNATURE:
++            usage = ecUsage;
++            usageCount = 1;
++            break;
++        case KU_KEY_AGREEMENT:
++            usage = &ecUsage[1];
++            usageCount = 1;
++            break;
++        case KU_DIGITAL_SIGNATURE|KU_KEY_AGREEMENT:
++        default: /* default to everything */
++            usage = ecUsage;
++            usageCount = 2;
++            break;
++        }
++        break;
+     }
+ 
+ try_faulty_3des:
+diff --git a/security/nss/lib/pk11wrap/pk11cert.c b/security/nss/lib/pk11wrap/pk11cert.c
+index e9245d6..0582f74 100644
+--- a/security/nss/lib/pk11wrap/pk11cert.c
++++ b/security/nss/lib/pk11wrap/pk11cert.c
+@@ -195,6 +195,8 @@ PK11_IsUserCert(PK11SlotInfo *slot, CERTCertificate *cert,
+ 	case keaKey:
+ 	case fortezzaKey:
+ 	case nullKey:
++        /* GOST_89_94_2001 */
++        /*case gostKey:*/
+ 	    /* fall through and return false */
+ 	    break;
+ 	}
+@@ -811,6 +813,10 @@ PK11_GetPubIndexKeyID(CERTCertificate *cert)
+     case ecKey:
+         newItem = SECITEM_DupItem(&pubk->u.ec.publicValue);
+ 	break;
++    /* GOST_89_94_2001 */
++    case gostKey:
++        newItem = SECITEM_DupItem(&pubk->u.gost.publicValue);
++        break;
+     case fortezzaKey:
+     default:
+ 	newItem = NULL; /* Fortezza Fix later... */
+diff --git a/security/nss/lib/pk11wrap/pk11mech.c b/security/nss/lib/pk11wrap/pk11mech.c
+index f69c7fe..b1b5bd4 100644
+--- a/security/nss/lib/pk11wrap/pk11mech.c
++++ b/security/nss/lib/pk11wrap/pk11mech.c
+@@ -227,6 +227,7 @@ PK11_GetKeyMechanism(CK_KEY_TYPE type)
+     case CKK_EC:  /* CKK_ECDSA is deprecated */
+ 	return CKM_ECDSA;
+     case CKK_GENERIC_SECRET:
++    /* GOST_89_94_2001 */
+     default:
+ 	return CKM_SHA_1_HMAC;
+     }
+@@ -419,6 +420,10 @@ PK11_GetKeyType(CK_MECHANISM_TYPE type,unsigned long len)
+     case CKM_MD5_HMAC_GENERAL:
+     case CKM_TLS_PRF_GENERAL:
+ 	return CKK_GENERIC_SECRET;
++    /* GOST_89_94_2001 */
++    case CKM_GOSTR3410_2001:
++    case CKM_GOSTR3411_94_WITH_GOSTR3410_2001:
++        return CKK_GOST;
+     default:
+ 	return pk11_lookup(type)->keyType;
+     }
+@@ -627,6 +632,10 @@ PK11_GetKeyGenWithSize(CK_MECHANISM_TYPE type, int size)
+     case CKM_PBE_SHA1_DES2_EDE_CBC:
+     case CKM_PKCS5_PBKD2:
+     	return type;
++    /* GOST_89_94_2001 */
++    case CKM_GOSTR3410_2001:
++    case CKM_GOSTR3411_94_WITH_GOSTR3410_2001:
++        return CKM_GOST_KEY_PAIR_GEN;
+     default:
+ 	return pk11_lookup(type)->keyGen;
+     }
+@@ -1863,6 +1872,9 @@ PK11_MapSignKeyType(KeyType keyType)
+ 	return CKM_DSA;
+     case ecKey:
+ 	return CKM_ECDSA;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
++    /*    return CKK_GOST;*/
+     case dhKey:
+     default:
+ 	break;
+diff --git a/security/nss/lib/pk11wrap/pk11obj.c b/security/nss/lib/pk11wrap/pk11obj.c
+index 4323ebc..8721cc8 100644
+--- a/security/nss/lib/pk11wrap/pk11obj.c
++++ b/security/nss/lib/pk11wrap/pk11obj.c
+@@ -584,6 +584,8 @@ PK11_SignatureLen(SECKEYPrivateKey *key)
+ 	    }
+ 	}
+ 	break;
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	break;
+     }
+@@ -925,7 +927,9 @@ PK11_UnwrapPrivKey(PK11SlotInfo *slot, PK11SymKey *wrappingKey,
+     CK_BBOOL cktrue = CK_TRUE;
+     CK_BBOOL ckfalse = CK_FALSE;
+     CK_OBJECT_CLASS keyClass = CKO_PRIVATE_KEY;
+-    CK_ATTRIBUTE keyTemplate[15] ;
++    /* GOST_89_94_2001 */
++    /*CK_ATTRIBUTE keyTemplate[15] ;*/
++    CK_ATTRIBUTE keyTemplate[25] ;
+     int templateCount = 0;
+     CK_OBJECT_HANDLE privKeyID;
+     CK_MECHANISM mechanism;
+@@ -963,8 +967,8 @@ PK11_UnwrapPrivKey(PK11SlotInfo *slot, PK11SymKey *wrappingKey,
+     }
+ 
+     if (PK11_IsInternal(slot)) {
+-	PK11_SETATTRS(attrs, CKA_NETSCAPE_DB, idValue->data, 
+-		      idValue->len); attrs++;
++        PK11_SETATTRS(attrs, CKA_NETSCAPE_DB, idValue->data,
++                      idValue->len); attrs++;
+     }
+ 
+     templateCount = attrs - keyTemplate;
+@@ -1023,7 +1027,7 @@ PK11_UnwrapPrivKey(PK11SlotInfo *slot, PK11SymKey *wrappingKey,
+     }
+ 
+     if (crv != CKR_OK) {
+-	/* we couldn't unwrap the key, use the internal module to do the
++        /* we couldn't unwrap the key, use the internal module to do the
+ 	 * unwrap, then load the new key into the token */
+ 	 PK11SlotInfo *int_slot = PK11_GetInternalSlot();
+ 
+diff --git a/security/nss/lib/pk11wrap/pk11pk12.c b/security/nss/lib/pk11wrap/pk11pk12.c
+index a90081e..6c7111a 100644
+--- a/security/nss/lib/pk11wrap/pk11pk12.c
++++ b/security/nss/lib/pk11wrap/pk11pk12.c
+@@ -423,6 +423,8 @@ PK11_ImportAndReturnPrivateKey(PK11SlotInfo *slot, SECKEYRawPrivateKey *lpk,
+ 					lpk->u.dh.privateValue.len); attrs++;
+ 	    break;
+ 	/* what about fortezza??? */
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	    PORT_SetError(SEC_ERROR_BAD_KEY);
+ 	    goto loser;
+diff --git a/security/nss/lib/pk11wrap/pk11pub.h b/security/nss/lib/pk11wrap/pk11pub.h
+index 163a967..1974615 100644
+--- a/security/nss/lib/pk11wrap/pk11pub.h
++++ b/security/nss/lib/pk11wrap/pk11pub.h
+@@ -517,6 +517,10 @@ SECKEYPrivateKey * PK11_FindKeyByKeyID(PK11SlotInfo *slot, SECItem *keyID,
+ 				       void *wincx);
+ int PK11_GetPrivateModulusLen(SECKEYPrivateKey *key); 
+ 
++/* GOST_89_94_2001 */
++CK_ITEM_PTR PK11_GetDBPrivateKey(PK11SlotInfo *slot, CK_OBJECT_HANDLE privID);
++/* GOST_89_94_2001 */
++
+ /* note: despite the name, this function takes a private key. */
+ SECStatus PK11_PubDecryptRaw(SECKEYPrivateKey *key, unsigned char *data,
+    unsigned *outLen, unsigned int maxLen, unsigned char *enc, unsigned encLen);
+diff --git a/security/nss/lib/pk11wrap/pk11skey.c b/security/nss/lib/pk11wrap/pk11skey.c
+index acf65ac..1f6fff2 100644
+--- a/security/nss/lib/pk11wrap/pk11skey.c
++++ b/security/nss/lib/pk11wrap/pk11skey.c
+@@ -1558,6 +1558,8 @@ PK11_PubDerive(SECKEYPrivateKey *privKey, SECKEYPublicKey *pubKey,
+     switch (privKey->keyType) {
+     case rsaKey:
+     case nullKey:
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+ 	PORT_SetError(SEC_ERROR_BAD_KEY);
+ 	break;
+     case dsaKey:
+@@ -1875,6 +1877,8 @@ PK11_PubDeriveWithKDF(SECKEYPrivateKey *privKey, SECKEYPublicKey *pubKey,
+ 	return pk11_PubDeriveECKeyWithKDF( privKey, pubKey, isSender, 
+ 		randomA, randomB, derive, target, operation, keySize, 
+ 		kdf, sharedData, wincx);
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default: break;
+     }
+ 
+diff --git a/security/nss/lib/pk11wrap/pk11slot.c b/security/nss/lib/pk11wrap/pk11slot.c
+index 9a9216a..ba6999d 100644
+--- a/security/nss/lib/pk11wrap/pk11slot.c
++++ b/security/nss/lib/pk11wrap/pk11slot.c
+@@ -896,6 +896,7 @@ PK11_GetSlotList(CK_MECHANISM_TYPE type)
+ 	return &pk11_ideaSlotList;
+     case CKM_FAKE_RANDOM:
+ 	return &pk11_randomSlotList;
++    /* GOST_89_94_2001 */
+     }
+     return NULL;
+ }
+diff --git a/security/nss/lib/pkcs12/p12.h b/security/nss/lib/pkcs12/p12.h
+index 852047c..0f3ff3f 100644
+--- a/security/nss/lib/pkcs12/p12.h
++++ b/security/nss/lib/pkcs12/p12.h
+@@ -207,6 +207,11 @@ SECStatus
+ SEC_PKCS12DecoderIterateNext(SEC_PKCS12DecoderContext *p12dcx,
+                              const SEC_PKCS12DecoderItem **ipp);
+ 
++/* GOST_89_94_2001 */
++extern CERTCertificate *
++SEC_PKCS12DecodeDERCertificate(SECItem *derSignedCert, PRBool copyDER, char *nickname);
++/* GOST_89_94_2001 */
++
+ SEC_END_PROTOS
+ 
+ #endif
+diff --git a/security/nss/lib/pkcs12/p12d.c b/security/nss/lib/pkcs12/p12d.c
+index 408bd8f..8c5cf1f 100644
+--- a/security/nss/lib/pkcs12/p12d.c
++++ b/security/nss/lib/pkcs12/p12d.c
+@@ -2844,6 +2844,10 @@ sec_pkcs12_get_public_value_and_type(SECKEYPublicKey *pubKey,
+         case ecKey:
+ 	    pubValue = &pubKey->u.ec.publicValue;
+ 	    break;
++        /* GOST_89_94_2001 */
++        case gostKey:
++            pubValue = &pubKey->u.gost.publicValue;
++            break;
+ 	default:
+ 	    pubValue = NULL;
+     }
+@@ -3553,3 +3557,11 @@ sec_PKCS12ConvertOldSafeToNew(PRArenaPool *arena, PK11SlotInfo *slot,
+ 
+     return p12dcx;
+ }
++
++/* GOST_89_94_2001 */
++CERTCertificate *
++SEC_PKCS12DecodeDERCertificate(SECItem *derSignedCert, PRBool copyDER, char *nickname)
++{
++    return CERT_DecodeDERCertificate(derSignedCert, copyDER, nickname);
++}
++/* GOST_89_94_2001 */
+diff --git a/security/nss/lib/pkcs12/p12e.c b/security/nss/lib/pkcs12/p12e.c
+index 959d374..c0b5dad 100644
+--- a/security/nss/lib/pkcs12/p12e.c
++++ b/security/nss/lib/pkcs12/p12e.c
+@@ -1163,7 +1163,7 @@ SEC_PKCS12AddCert(SEC_PKCS12ExportContext *p12ctxt, SEC_PKCS12SafeInfo *safe,
+ 					   safeBag);
+     } else {
+ 	rv = sec_pkcs12_append_bag(p12ctxt, safe, safeBag);
+-    }
++    }    
+ 
+     if(rv != SECSuccess) {
+ 	goto loser;
+diff --git a/security/nss/lib/softoken/fipsaudt.c b/security/nss/lib/softoken/fipsaudt.c
+index 573a17c..2d46c54 100644
+--- a/security/nss/lib/softoken/fipsaudt.c
++++ b/security/nss/lib/softoken/fipsaudt.c
+@@ -349,3 +349,17 @@ void sftk_AuditDigestKey(CK_SESSION_HANDLE hSession,
+ 	(PRUint32)hSession, (PRUint32)hKey, (PRUint32)rv);
+     sftk_LogAuditMessage(severity, NSS_AUDIT_DIGEST_KEY, msg);
+ }
++
++/* GOST_89_94_2001 */
++void sftk_AuditGetDBPrivateKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject, CK_ITEM_PTR_PTR ppDerPK, CK_RV rv)
++{
++    char msg[256];
++    NSSAuditSeverity severity = (rv == CKR_OK) ?
++        NSS_AUDIT_INFO : NSS_AUDIT_ERROR;
++
++    PR_snprintf(msg, sizeof msg,
++        "C_GetDBPrivateKey(hSession=0x%08lX, hObject=0x%08lX, ppDerPK=%p)=0x%08lX",
++        (PRUint32)hSession, (PRUint32)hObject, ppDerPK, (PRUint32)rv);
++    sftk_LogAuditMessage(severity, NSS_AUDIT_DERIVE_KEY, msg);
++}
++/* GOST_89_94_2001 */
+diff --git a/security/nss/lib/softoken/fipstokn.c b/security/nss/lib/softoken/fipstokn.c
+index 96fc6f2..193de37 100644
+--- a/security/nss/lib/softoken/fipstokn.c
++++ b/security/nss/lib/softoken/fipstokn.c
+@@ -910,7 +910,6 @@ CK_RV FC_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo) {
+ }
+ 
+ 
+-
+ /* FC_FindObjectsInit initializes a search for token and session objects 
+  * that match a template. */
+  CK_RV FC_FindObjectsInit(CK_SESSION_HANDLE hSession,
+@@ -1605,3 +1604,24 @@ CK_RV FC_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot,
+ 
+     return NSC_WaitForSlotEvent(flags, pSlot, pReserved);
+ }
++
++
++/* GOST_89_94_2001 */
++/* C_GetDBPrivateKey obtains the private key in DER format. */
++CK_RV FC_GetDBPrivateKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject, CK_ITEM_PTR_PTR ppDerPK)
++{
++    CK_RV rv;
++
++    CHECK_FORK();
++
++    SFTK_FIPSFATALCHECK();
++
++    rv = NSC_GetDBPrivateKey(hSession, hObject, ppDerPK);
++
++    if (sftk_audit_enabled) {
++        sftk_AuditGetDBPrivateKey(hSession, hObject, ppDerPK, rv);
++    }
++
++    return rv;
++}
++/* GOST_89_94_2001 */
+diff --git a/security/nss/lib/softoken/legacydb/keydb.c b/security/nss/lib/softoken/legacydb/keydb.c
+index e6ba01e..98b55f4 100644
+--- a/security/nss/lib/softoken/legacydb/keydb.c
++++ b/security/nss/lib/softoken/legacydb/keydb.c
+@@ -1634,6 +1634,29 @@ seckey_encrypt_private_key( PLArenaPool *permarena, NSSLOWKEYPrivateKey *pk,
+ 
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
++      case NSSLOWKEYGOSTKey:
++        prepare_low_gost_priv_key_for_asn1(pk);
++        dummy = SEC_ASN1EncodeItem(temparena, &(pki->privateKey), pk,
++                                   nsslowkey_GOSTPrivateKeyTemplate);
++        if (dummy == NULL) {
++            rv = SECFailure;
++            goto loser;
++        }
++
++        prepare_low_gost_params_for_asn1(&pk->u.gost.params);
++        dummy = SEC_ASN1EncodeItem(temparena, NULL, &pk->u.gost.params,
++                                   nsslowkey_GOSTParamsTemplate);
++        if (dummy == NULL) {
++            rv = SECFailure;
++            goto loser;
++        }
++
++        rv = SECOID_SetAlgorithmID(temparena, &(pki->algorithm),
++                                   SEC_OID_PKCS7_GOSTR3410_2001, dummy);
++        if (rv == SECFailure) {
++            goto loser;
++        }
++        break;
+       default:
+ 	/* We don't support DH or Fortezza private keys yet */
+ 	PORT_Assert(PR_FALSE);
+@@ -1860,6 +1883,24 @@ seckey_decrypt_private_key(SECItem*epki,
+ 
+ 		break;
+ #endif /* NSS_ENABLE_ECC */
++              /* GOST_89_94_2001 */
++              case SEC_OID_PKCS7_GOSTR3410_2001:
++                pk->keyType = NSSLOWKEYGOSTKey;
++                prepare_low_gost_priv_key_for_asn1(pk);
++                if (SECSuccess != SECITEM_CopyItem(permarena, &newPrivateKey,
++                    &pki->privateKey) ) break;
++                rv = SEC_QuickDERDecodeItem(permarena, pk,
++                                        nsslowkey_GOSTPrivateKeyTemplate,
++                                        &newPrivateKey);
++                if (rv != SECSuccess)
++                    goto loser;
++                prepare_low_gost_params_for_asn1(&pk->u.gost.params);
++                if (SECSuccess != SECITEM_CopyItem(permarena, &newAlgParms,
++                    &pki->algorithm.parameters) ) break;
++                rv = SEC_QuickDERDecodeItem(permarena, &pk->u.gost.params,
++                                        nsslowkey_GOSTParamsTemplate,
++                                        &newAlgParms);
++                break;
+ 	      default:
+ 		rv = SECFailure;
+ 		break;
+@@ -1959,6 +2000,13 @@ nsslowkey_FindKeyByPublicKey(NSSLOWKEYDBHandle *handle, SECItem *modulus,
+     namekey.size = modulus->len;
+ 
+     pk = seckey_get_private_key(handle, &namekey, NULL, sdbpw);
++    /* GOST_89_94_2001 */
++    /* privKey doesn't consists publicValue in russian's gost keys */
++    /* see comments at the header file */
++    if (pk && pk->keyType == NSSLOWKEYGOSTKey) {
++        SECITEM_CopyItem(pk->arena, &pk->u.gost.publicValue, modulus);
++    }
++    /* GOST_89_94_2001 */
+     
+     /* no need to free dbkey, since its on the stack, and the data it
+      * points to is owned by the database
+@@ -1966,6 +2014,39 @@ nsslowkey_FindKeyByPublicKey(NSSLOWKEYDBHandle *handle, SECItem *modulus,
+     return(pk);
+ }
+ 
++/* GOST_89_94_2001 */
++SECItem *
++nsslowkey_FindDBPrivateKeyByPublicKey(NSSLOWKEYDBHandle *handle, SECItem *modulus, SDB *sdbpw)
++{
++    if (handle == NULL) {
++        PORT_SetError(SEC_ERROR_BAD_DATABASE);
++        return NULL;
++    }
++
++    if (modulus == NULL) {
++        return NULL;
++    }
++
++    DBT namekey;
++
++    namekey.data = modulus->data;
++    namekey.size = modulus->len;
++
++    SECItem *derPK = NULL;  
++
++    NSSLOWKEYDBKey *dbkey = get_dbkey(handle, &namekey);
++    if (dbkey) {
++        SECStatus rv = lg_util_decrypt(sdbpw, &(dbkey->derPK), &derPK);
++        if (rv != SECSuccess && derPK) {
++            SECITEM_ZfreeItem(derPK, PR_TRUE);
++            derPK = NULL;
++        }
++    }
++
++    return derPK;
++}
++/* GOST_89_94_2001 */
++
+ char *
+ nsslowkey_FindKeyNicknameByPublicKey(NSSLOWKEYDBHandle *handle, 
+ 					SECItem *modulus, SDB *sdbpw)
+diff --git a/security/nss/lib/softoken/legacydb/lgattr.c b/security/nss/lib/softoken/legacydb/lgattr.c
+index 3446448..66339dd 100644
+--- a/security/nss/lib/softoken/legacydb/lgattr.c
++++ b/security/nss/lib/softoken/legacydb/lgattr.c
+@@ -437,6 +437,48 @@ lg_GetPrivateKey(LGObjectCache *obj)
+     return privKey;
+ }
+ 
++/* GOST_89_94_2001 */
++CK_RV
++lg_GetDBPrivateKey(SDB *sdb, CK_OBJECT_HANDLE handle, CK_ITEM_PTR_PTR derPK)
++{
++    CK_RV rv = CKR_GENERAL_ERROR;
++
++    LGObjectCache *obj = lg_NewObjectCache(sdb, NULL, handle & ~LG_TOKEN_MASK);
++
++    if (obj == NULL) {
++        return CKR_OBJECT_HANDLE_INVALID;
++    }
++
++    NSSLOWKEYDBHandle *keyHandle = lg_getKeyDB(sdb);
++    if (!keyHandle) {
++        return CKR_GENERAL_ERROR;
++    }
++
++    SECItem *retPK = nsslowkey_FindDBPrivateKeyByPublicKey(keyHandle, &obj->dbKey, sdb);
++
++    if (retPK) {
++        CK_ITEM_PTR tmpPK = (CK_ITEM_PTR)PORT_ZAlloc(sizeof(CK_ITEM));
++
++        tmpPK->type = retPK->type;
++        if (retPK->len) {
++            tmpPK->data = (CK_CHAR_PTR)PORT_ZAlloc(retPK->len);
++            PORT_Memcpy(tmpPK->data, retPK->data, retPK->len);
++        }
++        tmpPK->len = retPK->len;
++
++        SECITEM_ZfreeItem(retPK, PR_TRUE);
++
++        *derPK = tmpPK;
++
++        rv = CKR_OK;
++    }
++
++    lg_DestroyObjectCache(obj);
++
++    return rv;
++}
++/* GOST_89_94_2001 */
++
+ /* lg_GetPubItem returns data associated with the public key.
+  * one only needs to free the public key. This comment is here
+  * because this sematic would be non-obvious otherwise. All callers
+@@ -461,6 +503,10 @@ lg_GetPubItem(NSSLOWKEYPublicKey *pubKey) {
+ 	    pubItem = &pubKey->u.ec.publicValue;
+ 	    break;
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    case NSSLOWKEYGOSTKey:
++            pubItem = &pubKey->u.gost.publicValue;
++            break;
+     default:
+ 	    break;
+     }
+@@ -636,6 +682,44 @@ lg_FindECPublicKeyAttribute(NSSLOWKEYPublicKey *key, CK_ATTRIBUTE_TYPE type,
+ }
+ #endif /* NSS_ENABLE_ECC */
+ 
++/* GOST_89_94_2001 */
++static CK_RV
++lg_FindGOSTPublicKeyAttribute(NSSLOWKEYPublicKey *key, CK_ATTRIBUTE_TYPE type,
++                                CK_ATTRIBUTE *attribute)
++{
++    unsigned char hash[SHA1_LENGTH];
++    CK_KEY_TYPE keyType = CKK_GOST;
++
++    switch (type) {
++    case CKA_KEY_TYPE:
++        return lg_ULongAttribute(attribute, type, keyType);
++    case CKA_ID:
++        SHA1_HashBuf(hash, key->u.gost.publicValue.data,
++                     key->u.gost.publicValue.len);
++        return lg_CopyAttribute(attribute,type,hash,SHA1_LENGTH);
++    case CKA_DERIVE:
++    case CKA_VERIFY:
++        return LG_CLONE_ATTR(attribute,type,lg_StaticTrueAttr);
++    case CKA_ENCRYPT:
++    case CKA_VERIFY_RECOVER:
++    case CKA_WRAP:
++        return LG_CLONE_ATTR(attribute,type,lg_StaticFalseAttr);
++    case CKA_VALUE:
++        return lg_CopyAttributeSigned(attribute,type,
++                                        key->u.dh.publicValue.data,
++                                        key->u.dh.publicValue.len);
++    case CKA_GOST_PARAMSET2001:
++        return lg_CopyAttributeSigned(attribute,type,key->u.gost.params.paramSet2001.data,
++                                        key->u.gost.params.paramSet2001.len);
++    case CKA_GOST_PARAMSET94:
++        return lg_CopyAttributeSigned(attribute,type,key->u.gost.params.paramSet94.data,
++                                        key->u.gost.params.paramSet94.len);
++    default:
++        break;
++    }
++    return lg_invalidAttribute(attribute);
++}
++/* GOST_89_94_2001 */
+ 
+ static CK_RV
+ lg_FindPublicKeyAttribute(LGObjectCache *obj, CK_ATTRIBUTE_TYPE type,
+@@ -690,6 +774,9 @@ lg_FindPublicKeyAttribute(LGObjectCache *obj, CK_ATTRIBUTE_TYPE type,
+     case NSSLOWKEYECKey:
+ 	return lg_FindECPublicKeyAttribute(key,type,attribute);
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    case NSSLOWKEYGOSTKey:
++        return lg_FindGOSTPublicKeyAttribute(key,type,attribute);
+     default:
+ 	break;
+     }
+@@ -1018,6 +1105,50 @@ lg_FindECPrivateKeyAttribute(NSSLOWKEYPrivateKey *key, CK_ATTRIBUTE_TYPE type,
+ }
+ #endif /* NSS_ENABLE_ECC */
+ 
++/* GOST_89_94_2001 */
++static CK_RV
++lg_FindGOSTPrivateKeyAttribute(NSSLOWKEYPrivateKey *key, CK_ATTRIBUTE_TYPE type,
++                                CK_ATTRIBUTE *attribute, SDB *sdbpw)
++{
++    unsigned char hash[SHA1_LENGTH];
++    CK_KEY_TYPE keyType = CKK_GOST;
++
++    switch (type) {
++    case CKA_KEY_TYPE:
++        return lg_ULongAttribute(attribute, type, keyType);
++    case CKA_ID:
++        SHA1_HashBuf(hash,key->u.gost.publicValue.data,key->u.gost.publicValue.len);
++        return lg_CopyAttribute(attribute,type,hash,SHA1_LENGTH);
++    case CKA_DERIVE:
++    case CKA_SIGN:
++        return LG_CLONE_ATTR(attribute,type,lg_StaticTrueAttr);
++    case CKA_DECRYPT:
++    case CKA_SIGN_RECOVER:
++    case CKA_UNWRAP:
++        return LG_CLONE_ATTR(attribute,type,lg_StaticFalseAttr);
++    case CKA_VALUE:
++        return lg_CopyPrivAttrSigned(attribute, type,
++                                        key->u.gost.privateValue.data,
++                                        key->u.gost.privateValue.len, sdbpw);
++    case CKA_GOST_PARAMSET2001:
++        return lg_CopyAttributeSigned(attribute, type,
++                                        key->u.gost.params.paramSet2001.data,
++                                        key->u.gost.params.paramSet2001.len);
++    case CKA_GOST_PARAMSET94:
++        return lg_CopyAttributeSigned(attribute, type,
++                                        key->u.gost.params.paramSet94.data,
++                                        key->u.gost.params.paramSet94.len);
++    case CKA_NETSCAPE_DB:
++        return lg_CopyAttributeSigned(attribute, type,
++                                        key->u.gost.publicValue.data,
++                                        key->u.gost.publicValue.len);
++    default:
++        break;
++    }
++    return lg_invalidAttribute(attribute);
++}
++/* GOST_89_94_2001 */
++
+ static CK_RV
+ lg_FindPrivateKeyAttribute(LGObjectCache *obj, CK_ATTRIBUTE_TYPE type,
+ 				CK_ATTRIBUTE *attribute)
+@@ -1067,6 +1198,9 @@ lg_FindPrivateKeyAttribute(LGObjectCache *obj, CK_ATTRIBUTE_TYPE type,
+     case NSSLOWKEYECKey:
+ 	return lg_FindECPrivateKeyAttribute(key,type,attribute,obj->sdb);
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    case NSSLOWKEYGOSTKey:
++        return lg_FindGOSTPrivateKeyAttribute(key,type,attribute,obj->sdb);
+     default:
+ 	break;
+     }
+@@ -1388,7 +1522,7 @@ lg_GetSingleAttribute(LGObjectCache *obj, CK_ATTRIBUTE *attribute)
+     case CKO_PUBLIC_KEY:
+ 	return lg_FindPublicKeyAttribute(obj,type,attribute);
+     case CKO_PRIVATE_KEY:
+-	return lg_FindPrivateKeyAttribute(obj,type,attribute);
++        return lg_FindPrivateKeyAttribute(obj,type,attribute);
+     case CKO_SECRET_KEY:
+ 	return lg_FindSecretKeyAttribute(obj,type,attribute);
+     default:
+diff --git a/security/nss/lib/softoken/legacydb/lgcreate.c b/security/nss/lib/softoken/legacydb/lgcreate.c
+index ab6c652..c8f7c78 100644
+--- a/security/nss/lib/softoken/legacydb/lgcreate.c
++++ b/security/nss/lib/softoken/legacydb/lgcreate.c
+@@ -453,6 +453,9 @@ lg_createPublicKeyObject(SDB *sdb, CK_KEY_TYPE key_type,
+     case CKK_DSA:
+     case CKK_DH:
+ 	break;
++    /* GOST_89_94_2001 */
++    case CKK_GOST:
++        break;
+     default:
+ 	return CKR_ATTRIBUTE_VALUE_INVALID;
+     }
+@@ -665,7 +668,28 @@ lg_mkPrivKey(SDB *sdb, const CK_ATTRIBUTE *templ, CK_ULONG count,
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
++    case CKK_GOST:
++        privKey->keyType = NSSLOWKEYGOSTKey;
++        crv = lg_Attribute2SSecItem(arena,CKA_GOST_PARAMSET2001,templ,count,
++                                        &privKey->u.gost.params.paramSet2001);
++        if (crv != CKR_OK) break;
++        crv = lg_Attribute2SSecItem(arena,CKA_GOST_PARAMSET94,templ,count,
++                                        &privKey->u.gost.params.paramSet94);
++        if (crv != CKR_OK) break;
++        crv = lg_PrivAttr2SSecItem(arena,CKA_VALUE,templ,count,
++                                        &privKey->u.gost.privateValue, sdb);
++        if (crv != CKR_OK) break;
++        if (lg_hasAttribute(CKA_NETSCAPE_DB, templ, count)) {
++            crv = lg_Attribute2SSecItem(arena, CKA_NETSCAPE_DB,templ,count,
++                                        &privKey->u.gost.publicValue);
++            /* privKey was zero'd so public value is already set to NULL, 0
++             * if we don't set it explicitly */
++        }
++        break;
++
+     default:
++
+ 	crv = CKR_KEY_TYPE_INCONSISTENT;
+ 	break;
+     }
+diff --git a/security/nss/lib/softoken/legacydb/lgdb.h b/security/nss/lib/softoken/legacydb/lgdb.h
+index ed6f129..732651d 100644
+--- a/security/nss/lib/softoken/legacydb/lgdb.h
++++ b/security/nss/lib/softoken/legacydb/lgdb.h
+@@ -182,6 +182,10 @@ CK_RV lg_DestroyObject(SDB *sdb, CK_OBJECT_HANDLE object_id);
+ CK_RV lg_Close(SDB *sdb);
+ CK_RV lg_Reset(SDB *sdb);
+ 
++/* GOST_89_94_2001 */
++CK_RV lg_GetDBPrivateKey(SDB *sdb, CK_OBJECT_HANDLE handle, CK_ITEM_PTR_PTR derPK);
++/* GOST_89_94_2001 */
++
+ /*
+  * The old database doesn't share and doesn't support
+  * transactions.
+diff --git a/security/nss/lib/softoken/legacydb/lginit.c b/security/nss/lib/softoken/legacydb/lginit.c
+index fd34d6d..b2ad8e4 100644
+--- a/security/nss/lib/softoken/legacydb/lginit.c
++++ b/security/nss/lib/softoken/legacydb/lginit.c
+@@ -558,6 +558,9 @@ lg_init(SDB **pSdb, int flags, NSSLOWCERTCertDBHandle *certdbPtr,
+     sdb->sdb_Reset = lg_Reset;
+     sdb->sdb_Close = lg_Close;
+     sdb->sdb_SetForkState = lg_SetForkState;
++    /* GOST_89_94_2001 */
++    sdb->sdb_GetDBPrivateKey = lg_GetDBPrivateKey;
++    /* GOST_89_94_2001 */
+ 
+     *pSdb = sdb;
+     return CKR_OK;
+diff --git a/security/nss/lib/softoken/legacydb/lowcert.c b/security/nss/lib/softoken/legacydb/lowcert.c
+index 703faeb..450bd9f 100644
+--- a/security/nss/lib/softoken/legacydb/lowcert.c
++++ b/security/nss/lib/softoken/legacydb/lowcert.c
+@@ -77,6 +77,13 @@ static const SEC_ASN1Template nsslowcert_DHPublicKeyTemplate[] = {
+     { 0, }
+ };
+ 
++/* GOST_89_94_2001 */
++static const SEC_ASN1Template nsslowcert_GOSTPublicKeyTemplate[] = {
++    { SEC_ASN1_OCTET_STRING, offsetof(NSSLOWKEYPublicKey,u.gost.publicValue), },
++    { 0, }
++};
++/* GOST_89_94_2001 */
++
+ /*
+  * See bugzilla bug 125359
+  * Since NSS (via PKCS#11) wants to handle big integers as unsigned ints,
+@@ -110,6 +117,16 @@ prepare_low_dh_pub_key_for_asn1(NSSLOWKEYPublicKey *pubk)
+     pubk->u.dh.publicValue.type = siUnsignedInteger;
+ }
+ 
++/* GOST_89_94_2001 */
++static void
++prepare_low_gost_pub_key_for_asn1(NSSLOWKEYPublicKey *pubk)
++{
++    pubk->u.gost.params.paramSet2001.type = siUnsignedInteger;
++    pubk->u.gost.params.paramSet94.type = siUnsignedInteger;
++    pubk->u.gost.publicValue.type = siUnsignedInteger;
++}
++/* GOST_89_94_2001 */
++
+ /*
+  * simple cert decoder to avoid the cost of asn1 engine
+  */ 
+@@ -820,6 +837,14 @@ nsslowcert_ExtractPublicKey(NSSLOWCERTCertificate *cert)
+ 	if (rv == SECSuccess) return pubk;
+         break;
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    case SEC_OID_PKCS7_GOSTR3410_2001:
++        pubk->keyType = NSSLOWKEYGOSTKey;
++        prepare_low_gost_pub_key_for_asn1(pubk);
++        rv = SEC_QuickDERDecodeItem(arena, pubk,
++                                 nsslowcert_GOSTPublicKeyTemplate, &os);
++        if (rv == SECSuccess) return pubk;
++        break;
+       default:
+         rv = SECFailure;
+         break;
+diff --git a/security/nss/lib/softoken/legacydb/lowkey.c b/security/nss/lib/softoken/legacydb/lowkey.c
+index 5ee64d1..c667ba1 100644
+--- a/security/nss/lib/softoken/legacydb/lowkey.c
++++ b/security/nss/lib/softoken/legacydb/lowkey.c
+@@ -167,6 +167,21 @@ const SEC_ASN1Template nsslowkey_ECPrivateKeyTemplate[] = {
+     { 0, }
+ };
+ 
++/* GOST_89_94_2001 */
++const SEC_ASN1Template nsslowkey_GOSTParamsTemplate[] = {
++    { SEC_ASN1_SEQUENCE, 0, NULL, sizeof(GOSTParams) },
++    { SEC_ASN1_OBJECT_ID, offsetof(GOSTParams,paramSet2001) },
++    { SEC_ASN1_OBJECT_ID, offsetof(GOSTParams,paramSet94) },
++    { 0, }
++};
++
++const SEC_ASN1Template nsslowkey_GOSTPrivateKeyTemplate[] = {
++    { SEC_ASN1_INTEGER,
++      offsetof(NSSLOWKEYPrivateKey,u.gost.privateValue) },
++    { 0, }
++};
++/* GOST_89_94_2001 */
++
+ 
+ /*
+  * smaller version of EC_FillParams. In this code, we only need
+@@ -310,6 +325,22 @@ prepare_low_ec_priv_key_for_asn1(NSSLOWKEYPrivateKey *key)
+ }
+ #endif /* NSS_ENABLE_ECC */
+ 
++/* GOST_89_94_2001 */
++void
++prepare_low_gost_params_for_asn1(GOSTParams *params)
++{
++    params->paramSet2001.type = siUnsignedInteger;
++    params->paramSet94.type = siUnsignedInteger;
++}
++
++void
++prepare_low_gost_priv_key_for_asn1(NSSLOWKEYPrivateKey *key)
++{
++    key->u.gost.privateValue.type = siUnsignedInteger;
++    key->u.gost.publicValue.type = siUnsignedInteger;
++}
++/* GOST_89_94_2001 */
++
+ void
+ nsslowkey_DestroyPrivateKey(NSSLOWKEYPrivateKey *privk)
+ {
+@@ -458,6 +489,26 @@ nsslowkey_ConvertToPublicKey(NSSLOWKEYPrivateKey *privk)
+ #endif /* NSS_ENABLE_ECC */
+ 	/* No Fortezza in Low Key implementations (Fortezza keys aren't
+ 	 * stored in our data base */
++    /* GOST_89_94_2001 */
++    case NSSLOWKEYGOSTKey:
++        pubk = (NSSLOWKEYPublicKey *)PORT_ArenaZAlloc(arena,
++                                                    sizeof(NSSLOWKEYPublicKey));
++        if (pubk != NULL) {
++            SECStatus rv;
++
++            pubk->arena = arena;
++            pubk->keyType = privk->keyType;
++            rv = SECITEM_CopyItem(arena, &pubk->u.gost.publicValue,
++                                  &privk->u.gost.publicValue);
++            if (rv != SECSuccess) break;
++            rv = SECITEM_CopyItem(arena, &pubk->u.gost.params.paramSet2001,
++                                  &privk->u.gost.params.paramSet2001);
++            if (rv != SECSuccess) break;
++            rv = SECITEM_CopyItem(arena, &pubk->u.gost.params.paramSet94,
++                                  &privk->u.gost.params.paramSet94);
++            if (rv == SECSuccess) return pubk;
++        }
++        break;
+     default:
+ 	break;
+     }
+diff --git a/security/nss/lib/softoken/legacydb/lowkeyi.h b/security/nss/lib/softoken/legacydb/lowkeyi.h
+index a40ff95..3dc0c6f 100644
+--- a/security/nss/lib/softoken/legacydb/lowkeyi.h
++++ b/security/nss/lib/softoken/legacydb/lowkeyi.h
+@@ -66,6 +66,11 @@ extern void prepare_low_ec_priv_key_for_asn1(NSSLOWKEYPrivateKey *key);
+ extern void prepare_low_ecparams_for_asn1(ECParams *params);
+ #endif /* NSS_ENABLE_ECC */
+ 
++/* GOST_89_94_2001 */
++extern void prepare_low_gost_params_for_asn1(GOSTParams *params);
++extern void prepare_low_gost_priv_key_for_asn1(NSSLOWKEYPrivateKey *key);
++/* GOST_89_94_2001 */
++
+ typedef char * (* NSSLOWKEYDBNameFunc)(void *arg, int dbVersion);
+     
+ /*
+@@ -177,6 +182,11 @@ extern NSSLOWKEYPrivateKey *
+ nsslowkey_FindKeyByPublicKey(NSSLOWKEYDBHandle *handle, SECItem *modulus, 
+ 			  SDB *sdb);
+ 
++/* GOST_89_94_2001 */
++extern SECItem *
++nsslowkey_FindDBPrivateKeyByPublicKey(NSSLOWKEYDBHandle *handle, SECItem *modulus, SDB *sdbpw);
++/* GOST_89_94_2001 */
++
+ extern char *
+ nsslowkey_FindKeyNicknameByPublicKey(NSSLOWKEYDBHandle *handle,
+                                         SECItem *modulus, SDB *sdb);
+diff --git a/security/nss/lib/softoken/legacydb/lowkeyti.h b/security/nss/lib/softoken/legacydb/lowkeyti.h
+index 7fa74da..1ca4bdd 100644
+--- a/security/nss/lib/softoken/legacydb/lowkeyti.h
++++ b/security/nss/lib/softoken/legacydb/lowkeyti.h
+@@ -85,6 +85,11 @@ extern const SEC_ASN1Template nsslowkey_ECPrivateKeyTemplate[];
+ extern const SEC_ASN1Template nsslowkey_PrivateKeyInfoTemplate[];
+ extern const SEC_ASN1Template nsslowkey_EncryptedPrivateKeyInfoTemplate[];
+ 
++/* GOST_89_94_2001 */
++extern const SEC_ASN1Template nsslowkey_GOSTParamsTemplate[];
++extern const SEC_ASN1Template nsslowkey_GOSTPrivateKeyTemplate[];
++/* GOST_89_94_2001 */
++
+ /*
+  * PKCS #8 attributes
+  */
+@@ -123,7 +128,9 @@ typedef enum {
+     NSSLOWKEYRSAKey = 1, 
+     NSSLOWKEYDSAKey = 2, 
+     NSSLOWKEYDHKey = 4,
+-    NSSLOWKEYECKey = 5
++    NSSLOWKEYECKey = 5,
++    /* GOST_89_94_2001 */
++    NSSLOWKEYGOSTKey = 6
+ } NSSLOWKEYType;
+ 
+ /*
+@@ -137,6 +144,8 @@ struct NSSLOWKEYPublicKeyStr {
+ 	DSAPublicKey dsa;
+ 	DHPublicKey  dh;
+ 	ECPublicKey  ec;
++        /* GOST_89_94_2001 */
++        GOSTPublicKey gost;
+     } u;
+ };
+ typedef struct NSSLOWKEYPublicKeyStr NSSLOWKEYPublicKey;
+@@ -154,6 +163,8 @@ struct NSSLOWKEYPrivateKeyStr {
+ 	DSAPrivateKey dsa;
+ 	DHPrivateKey  dh;
+ 	ECPrivateKey  ec;
++        /* GOST_89_94_2001 */
++        GOSTPrivateKey  gost;
+     } u;
+ };
+ typedef struct NSSLOWKEYPrivateKeyStr NSSLOWKEYPrivateKey;
+diff --git a/security/nss/lib/softoken/lowkey.c b/security/nss/lib/softoken/lowkey.c
+index 4174cef..8136a4f 100644
+--- a/security/nss/lib/softoken/lowkey.c
++++ b/security/nss/lib/softoken/lowkey.c
+@@ -183,6 +183,21 @@ const SEC_ASN1Template nsslowkey_ECPrivateKeyTemplate[] = {
+  * siUnsignedInteger.
+  */
+ 
++/* GOST_89_94_2001 */
++const SEC_ASN1Template nsslowkey_GOSTParamsTemplate[] = {
++    { SEC_ASN1_SEQUENCE, 0, NULL, sizeof(GOSTParams) },
++    { SEC_ASN1_OBJECT_ID, offsetof(GOSTParams,paramSet2001) },
++    { SEC_ASN1_OBJECT_ID, offsetof(GOSTParams,paramSet94) },
++    { 0, }
++};
++
++const SEC_ASN1Template nsslowkey_GOSTPrivateKeyTemplate[] = {
++    { SEC_ASN1_INTEGER,
++      offsetof(NSSLOWKEYPrivateKey,u.gost.privateValue) },
++    { 0, }
++};
++/* GOST_89_94_2001 */
++
+ void
+ prepare_low_rsa_priv_key_for_asn1(NSSLOWKEYPrivateKey *key)
+ {
+@@ -248,6 +263,22 @@ prepare_low_ec_priv_key_for_asn1(NSSLOWKEYPrivateKey *key)
+ }
+ #endif /* NSS_ENABLE_ECC */
+ 
++/* GOST_89_94_2001 */
++void
++prepare_low_gost_params_for_asn1(GOSTParams *params)
++{
++    params->paramSet2001.type = siUnsignedInteger;
++    params->paramSet94.type = siUnsignedInteger;
++}
++
++void
++prepare_low_gost_priv_key_for_asn1(NSSLOWKEYPrivateKey *key)
++{
++    key->u.gost.privateValue.type = siUnsignedInteger;
++    key->u.gost.publicValue.type = siUnsignedInteger;
++}
++/* GOST_89_94_2001 */
++
+ void
+ nsslowkey_DestroyPrivateKey(NSSLOWKEYPrivateKey *privk)
+ {
+@@ -396,6 +427,26 @@ nsslowkey_ConvertToPublicKey(NSSLOWKEYPrivateKey *privk)
+ #endif /* NSS_ENABLE_ECC */
+ 	/* No Fortezza in Low Key implementations (Fortezza keys aren't
+ 	 * stored in our data base */
++    /* GOST_89_94_2001 */
++    case NSSLOWKEYGOSTKey:
++        pubk = (NSSLOWKEYPublicKey *)PORT_ArenaZAlloc(arena,
++                                                    sizeof(NSSLOWKEYPublicKey));
++        if (pubk != NULL) {
++            SECStatus rv;
++
++            pubk->arena = arena;
++            pubk->keyType = privk->keyType;
++            rv = SECITEM_CopyItem(arena, &pubk->u.gost.publicValue,
++                                  &privk->u.gost.publicValue);
++            if (rv != SECSuccess) break;
++            rv = SECITEM_CopyItem(arena, &pubk->u.gost.params.paramSet2001,
++                                  &privk->u.gost.params.paramSet2001);
++            if (rv != SECSuccess) break;
++            rv = SECITEM_CopyItem(arena, &pubk->u.gost.params.paramSet94,
++                                  &privk->u.gost.params.paramSet94);
++            if (rv == SECSuccess) return pubk;
++        }
++        break;
+     default:
+ 	break;
+     }
+@@ -510,6 +561,7 @@ nsslowkey_CopyPrivateKey(NSSLOWKEYPrivateKey *privKey)
+ 	    if (rv != SECSuccess) break;
+ 	    break;
+ #endif /* NSS_ENABLE_ECC */
++        /* GOST_89_94_2001 */
+ 	default:
+ 	    rv = SECFailure;
+     }
+diff --git a/security/nss/lib/softoken/lowkeyi.h b/security/nss/lib/softoken/lowkeyi.h
+index ec6f0e9..7091fc0 100644
+--- a/security/nss/lib/softoken/lowkeyi.h
++++ b/security/nss/lib/softoken/lowkeyi.h
+@@ -64,6 +64,11 @@ extern void prepare_low_ec_priv_key_for_asn1(NSSLOWKEYPrivateKey *key);
+ extern void prepare_low_ecparams_for_asn1(ECParams *params);
+ #endif /* NSS_ENABLE_ECC */
+ 
++/* GOST_89_94_2001 */
++extern void prepare_low_gost_params_for_asn1(GOSTParams *params);
++extern void prepare_low_gost_priv_key_for_asn1(NSSLOWKEYPrivateKey *key);
++/* GOST_89_94_2001 */
++
+ /*
+ ** Destroy a private key object.
+ **	"key" the object
+diff --git a/security/nss/lib/softoken/lowkeyti.h b/security/nss/lib/softoken/lowkeyti.h
+index 15bb973..7f10471 100644
+--- a/security/nss/lib/softoken/lowkeyti.h
++++ b/security/nss/lib/softoken/lowkeyti.h
+@@ -62,6 +62,11 @@ extern const SEC_ASN1Template nsslowkey_ECPrivateKeyTemplate[];
+ extern const SEC_ASN1Template nsslowkey_PrivateKeyInfoTemplate[];
+ extern const SEC_ASN1Template nsslowkey_EncryptedPrivateKeyInfoTemplate[];
+ 
++/* GOST_89_94_2001 */
++extern const SEC_ASN1Template nsslowkey_GOSTParamsTemplate[];
++extern const SEC_ASN1Template nsslowkey_GOSTPrivateKeyTemplate[];
++/* GOST_89_94_2001 */
++
+ /*
+  * PKCS #8 attributes
+  */
+@@ -89,7 +94,9 @@ typedef enum {
+     NSSLOWKEYRSAKey = 1, 
+     NSSLOWKEYDSAKey = 2, 
+     NSSLOWKEYDHKey = 4,
+-    NSSLOWKEYECKey = 5
++    NSSLOWKEYECKey = 5,
++    /* GOST_89_94_2001 */
++    NSSLOWKEYGOSTKey = 6
+ } NSSLOWKEYType;
+ 
+ /*
+@@ -103,6 +110,8 @@ struct NSSLOWKEYPublicKeyStr {
+ 	DSAPublicKey dsa;
+ 	DHPublicKey  dh;
+ 	ECPublicKey  ec;
++        /* GOST_89_94_2001 */
++        GOSTPublicKey gost;
+     } u;
+ };
+ typedef struct NSSLOWKEYPublicKeyStr NSSLOWKEYPublicKey;
+@@ -120,6 +129,8 @@ struct NSSLOWKEYPrivateKeyStr {
+ 	DSAPrivateKey dsa;
+ 	DHPrivateKey  dh;
+ 	ECPrivateKey  ec;
++        /* GOST_89_94_2001 */
++        GOSTPrivateKey  gost;
+     } u;
+ };
+ typedef struct NSSLOWKEYPrivateKeyStr NSSLOWKEYPrivateKey;
+diff --git a/security/nss/lib/softoken/pkcs11.c b/security/nss/lib/softoken/pkcs11.c
+index e536f8c..2dfa83c 100644
+--- a/security/nss/lib/softoken/pkcs11.c
++++ b/security/nss/lib/softoken/pkcs11.c
+@@ -70,6 +70,10 @@
+ #include "ec.h"
+ #include "secasn1.h"
+ 
++/* GOST_89_94_2001 */
++#include "sftkdbti.h"
++/* GOST_89_94_2001 */
++
+ PRBool parentForkedAfterC_Initialize;
+ 
+ #ifndef NO_FORK_CHECK
+@@ -487,6 +491,11 @@ static const struct mechanismList mechanisms[] = {
+      /* ------------------ AES Key Wrap (also encrypt)  ------------------- */
+      {CKM_NETSCAPE_AES_KEY_WRAP,	{16, 32, CKF_EN_DE_WR_UN},  PR_TRUE},
+      {CKM_NETSCAPE_AES_KEY_WRAP_PAD,	{16, 32, CKF_EN_DE_WR_UN},  PR_TRUE},
++     /* GOST_89_94_2001 */
++     /* private key: 256 bits, public key: 2001 - 512, 94 - 1024, symmetric key: 256 */
++     {CKM_GOST_KEY_PAIR_GEN,            {256, 256, CKF_GENERATE_KEY_PAIR}, PR_TRUE},
++     {CKM_GOSTR3410_2001, {256, 256, CKF_DUZ_IT_ALL},  PR_TRUE},
++     {CKM_GOSTR3411_94_WITH_GOSTR3410_2001, {256, 256, CKF_DUZ_IT_ALL},  PR_TRUE}
+ };
+ static const CK_ULONG mechanismCount = sizeof(mechanisms)/sizeof(mechanisms[0]);
+ 
+@@ -925,6 +934,23 @@ sftk_handlePublicKeyObject(SFTKSession *session, SFTKObject *object,
+ 	wrap = CK_FALSE;
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    case CKK_GOST:
++        if ( !sftk_hasAttribute(object, CKA_GOST_PARAMSET2001)) {
++            return CKR_TEMPLATE_INCOMPLETE;
++        }
++        if ( !sftk_hasAttribute(object, CKA_GOST_PARAMSET94)) {
++            return CKR_TEMPLATE_INCOMPLETE;
++        }
++        if ( !sftk_hasAttribute(object, CKA_VALUE)) {
++            return CKR_TEMPLATE_INCOMPLETE;
++        }
++        derive = CK_TRUE;
++        verify = CK_TRUE;
++        encrypt = CK_FALSE;
++        recover = CK_FALSE;
++        wrap = CK_FALSE;
++        break;
+     default:
+ 	return CKR_ATTRIBUTE_VALUE_INVALID;
+     }
+@@ -958,7 +984,7 @@ sftk_handlePublicKeyObject(SFTKSession *session, SFTKObject *object,
+ 	    return CKR_TOKEN_WRITE_PROTECTED;
+ 	}
+ 
+-	crv = sftkdb_write(certHandle, object, &object->handle);
++        crv = sftkdb_write(certHandle, object, &object->handle);
+ 	sftk_freeDB(certHandle);
+ 	return crv;
+     }
+@@ -1057,6 +1083,22 @@ sftk_handlePrivateKeyObject(SFTKSession *session,SFTKObject *object,CK_KEY_TYPE
+ 	wrap = CK_FALSE;
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    case CKK_GOST:
++        if ( !sftk_hasAttribute(object, CKA_GOST_PARAMSET2001)) {
++            return CKR_TEMPLATE_INCOMPLETE;
++        }
++        if ( !sftk_hasAttribute(object, CKA_GOST_PARAMSET94)) {
++            return CKR_TEMPLATE_INCOMPLETE;
++        }
++        if ( !sftk_hasAttribute(object, CKA_VALUE)) {
++            return CKR_TEMPLATE_INCOMPLETE;
++        }
++        encrypt = CK_FALSE;
++        sign = CK_TRUE;
++        recover = CK_FALSE;
++        wrap = CK_FALSE;
++        break;
+     default:
+ 	return CKR_ATTRIBUTE_VALUE_INVALID;
+     }
+@@ -1676,6 +1718,18 @@ NSSLOWKEYPublicKey *sftk_GetPubKey(SFTKObject *object,CK_KEY_TYPE key_type,
+ 	}
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    case CKK_GOST:
++        pubKey->keyType = NSSLOWKEYGOSTKey;
++        crv = sftk_Attribute2SSecItem(arena,&pubKey->u.gost.params.paramSet2001,
++                                                        object,CKA_GOST_PARAMSET2001);
++        if (crv != CKR_OK) break;
++        crv = sftk_Attribute2SSecItem(arena,&pubKey->u.gost.params.paramSet94,
++                                                        object,CKA_GOST_PARAMSET94);
++        if (crv != CKR_OK) break;
++        crv = sftk_Attribute2SSecItem(arena,&pubKey->u.gost.publicValue,
++                                                        object,CKA_VALUE);
++        break;
+     default:
+ 	crv = CKR_KEY_TYPE_INCONSISTENT;
+ 	break;
+@@ -1786,7 +1840,7 @@ sftk_mkPrivKey(SFTKObject *object, CK_KEY_TYPE key_type, CK_RV *crvp)
+ 
+ #ifdef NSS_ENABLE_ECC
+     case CKK_EC:
+-	privKey->keyType = NSSLOWKEYECKey;
++        privKey->keyType = NSSLOWKEYECKey;
+ 	crv = sftk_Attribute2SSecItem(arena, 
+ 				      &privKey->u.ec.ecParams.DEREncoding,
+ 				      object,CKA_EC_PARAMS);
+@@ -1817,6 +1871,25 @@ sftk_mkPrivKey(SFTKObject *object, CK_KEY_TYPE key_type, CK_RV *crvp)
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
++    case CKK_GOST:
++        privKey->keyType = NSSLOWKEYGOSTKey;
++        SFTK_SET_ITEM_TEMPLATE(itemTemplate, itemTemplateCount,
++                &privKey->u.gost.params.paramSet2001, CKA_GOST_PARAMSET2001);
++        itemTemplateCount++;
++        SFTK_SET_ITEM_TEMPLATE(itemTemplate, itemTemplateCount,
++                &privKey->u.gost.params.paramSet94, CKA_GOST_PARAMSET94);
++        itemTemplateCount++;
++        SFTK_SET_ITEM_TEMPLATE(itemTemplate, itemTemplateCount,
++                &privKey->u.gost.privateValue, CKA_VALUE);
++        itemTemplateCount++;
++        if (sftk_hasAttribute(object, CKA_NETSCAPE_DB)) {
++            crv = sftk_Attribute2SSecItem(arena, &privKey->u.gost.publicValue,
++                                object, CKA_NETSCAPE_DB);
++            /* privKey was zero'd so public value is already set to NULL, 0
++             * if we don't set it explicitly */
++        }
++        break;
+     default:
+ 	crv = CKR_KEY_TYPE_INCONSISTENT;
+ 	break;
+@@ -4418,3 +4491,44 @@ CK_RV NSC_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot,
+     return CKR_FUNCTION_NOT_SUPPORTED;
+ }
+ 
++/* GOST_89_94_2001 */
++CK_RV
++NSC_GetDBPrivateKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject, CK_ITEM_PTR_PTR ppDerPK)
++{
++    CHECK_FORK();
++
++    SFTKSession *session = sftk_SessionFromHandle(hSession);
++    if (session == NULL) {
++        return NULL;
++    }
++
++    if (!sftk_isToken(hObject)) {
++        return NULL;
++    }
++
++    SFTKSlot *slot = sftk_SlotFromSession(session);
++    SFTKDBHandle *dbHandle = sftk_getDBForTokenObject(slot, hObject);
++
++    if (dbHandle == NULL) {
++        sftk_FreeSession(session);
++        return NULL;
++    }
++
++    SDB *sdb = SFTK_GET_SDB(dbHandle);
++    hObject &= SFTK_OBJ_ID_MASK;
++
++    CK_ITEM_PTR tmpPK;
++    CK_RV rv = CKR_GENERAL_ERROR;
++    if (sdb->sdb_GetDBPrivateKey) {
++        rv = (*sdb->sdb_GetDBPrivateKey)(sdb, hObject, &tmpPK);
++        if (rv == CKR_OK) {
++            *ppDerPK = tmpPK;
++        }
++    }
++
++    sftk_freeDB(dbHandle);
++    sftk_FreeSession(session);
++
++    return rv;
++}
++/* GOST_89_94_2001 */
+diff --git a/security/nss/lib/softoken/pkcs11c.c b/security/nss/lib/softoken/pkcs11c.c
+index d45c6ff..3e34905 100644
+--- a/security/nss/lib/softoken/pkcs11c.c
++++ b/security/nss/lib/softoken/pkcs11c.c
+@@ -3249,6 +3249,7 @@ CK_RV NSC_GenerateKey(CK_SESSION_HANDLE hSession,
+ 	objclass = CKO_KG_PARAMETERS;
+ 	crv = CKR_OK;
+ 	break;
++    /* GOST_89_94_2001 */
+     default:
+ 	crv = CKR_MECHANISM_INVALID;
+ 	break;
+@@ -3532,6 +3533,7 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession,
+ 	    mech.mechanism = CKM_ECDSA;
+ 	    break;
+ #endif
++        /* GOST_89_94_2001 */
+ 	default:
+ 	    return CKR_DEVICE_ERROR;
+ 	}
+@@ -4046,6 +4048,7 @@ ecgn_done:
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
+     default:
+ 	crv = CKR_MECHANISM_INVALID;
+     }
+@@ -4248,6 +4251,7 @@ static SECItem *sftk_PackagePrivateKey(SFTKObject *key, CK_RV *crvp)
+ 	    break;
+ #endif /* NSS_ENABLE_ECC */
+ 	case NSSLOWKEYDHKey:
++        /* GOST_89_94_2001 */
+ 	default:
+ 	    dummy = NULL;
+ 	    break;
+@@ -4515,6 +4519,17 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
+ 	    prepare_low_ecparams_for_asn1(&lpk->u.ec.ecParams);
+ 	    break;
+ #endif /* NSS_ENABLE_ECC */
++        /* GOST_89_94_2001 */
++        case SEC_OID_PKCS7_GOSTR3410_2001:
++            /* openssl: function priv_decode_gost - it can be integer or string ? */
++            /*if (*(pki->privateKey.data) == SEC_ASN1_OCTET_STRING) {*/
++            keyTemplate = nsslowkey_GOSTPrivateKeyTemplate;
++            paramTemplate = nsslowkey_GOSTParamsTemplate;
++            paramDest = &(lpk->u.gost.params);
++            lpk->keyType = NSSLOWKEYGOSTKey;
++            prepare_low_gost_priv_key_for_asn1(lpk);
++            prepare_low_gost_params_for_asn1(&lpk->u.gost.params);
++            break;
+ 	default:
+ 	    keyTemplate = NULL;
+ 	    paramTemplate = NULL;
+@@ -4662,6 +4677,34 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
+ 	    /* XXX Do we need to decode the EC Params here ?? */
+ 	    break;
+ #endif /* NSS_ENABLE_ECC */
++        /* GOST_89_94_2001 */
++        case NSSLOWKEYGOSTKey:
++            keyType = CKK_GOST;
++            crv = (sftk_hasAttribute(key, CKA_NETSCAPE_DB)) ? CKR_OK :
++                                                CKR_KEY_TYPE_INCONSISTENT;
++            if(crv != CKR_OK) break;
++            crv = sftk_AddAttributeType(key, CKA_KEY_TYPE, &keyType,
++                                                sizeof(keyType));
++            if(crv != CKR_OK) break;
++            crv = sftk_AddAttributeType(key, CKA_SIGN, &cktrue,
++                                                sizeof(CK_BBOOL));
++            if(crv != CKR_OK) break;
++            crv = sftk_AddAttributeType(key, CKA_SIGN_RECOVER, &cktrue,
++                                                sizeof(CK_BBOOL));
++            if(crv != CKR_OK) break;
++            crv = sftk_AddAttributeType(key, CKA_DERIVE, &cktrue,
++                                                sizeof(CK_BBOOL));
++            if(crv != CKR_OK) break;
++            crv = sftk_AddAttributeType(key, CKA_GOST_PARAMSET2001,
++                                    sftk_item_expand(&lpk->u.gost.params.paramSet2001));
++            if(crv != CKR_OK) break;
++            crv = sftk_AddAttributeType(key, CKA_GOST_PARAMSET94,
++                                    sftk_item_expand(&lpk->u.gost.params.paramSet94));
++            if(crv != CKR_OK) break;
++            crv = sftk_AddAttributeType(key, CKA_VALUE,
++                        sftk_item_expand(&lpk->u.gost.privateValue));
++            if(crv != CKR_OK) break;
++            break;
+ 	default:
+ 	    crv = CKR_KEY_TYPE_INCONSISTENT;
+ 	    break;
+diff --git a/security/nss/lib/softoken/pkcs11u.c b/security/nss/lib/softoken/pkcs11u.c
+index 7f44873..27c5be5 100644
+--- a/security/nss/lib/softoken/pkcs11u.c
++++ b/security/nss/lib/softoken/pkcs11u.c
+@@ -1429,6 +1429,7 @@ stfk_CopyTokenPrivateKey(SFTKObject *destObject,SFTKTokenObject *src_to)
+ 							ecPrivKeyAttrsCount);
+ 	break;
+ #endif
++     /* GOST_89_94_2001 */
+      default:
+ 	crv = CKR_DEVICE_ERROR; /* shouldn't happen unless we store more types
+ 				* of token keys into our database. */
+@@ -1491,7 +1492,8 @@ stfk_CopyTokenPublicKey(SFTKObject *destObject,SFTKTokenObject *src_to)
+ 							ecPubKeyAttrsCount);
+ 	break;
+ #endif
+-     default:
++    /* GOST_89_94_2001 */
++    default:
+ 	crv = CKR_DEVICE_ERROR; /* shouldn't happen unless we store more types
+ 				* of token keys into our database. */
+     }
+diff --git a/security/nss/lib/softoken/sdb.c b/security/nss/lib/softoken/sdb.c
+index f9d8513..ac0840b 100644
+--- a/security/nss/lib/softoken/sdb.c
++++ b/security/nss/lib/softoken/sdb.c
+@@ -1928,6 +1928,9 @@ sdb_init(char *dbname, char *table, sdbDataType type, int *inUpdate,
+     sdb->sdb_Abort = sdb_Abort;
+     sdb->sdb_Close = sdb_Close;
+     sdb->sdb_SetForkState = sdb_SetForkState;
++    /* GOST_89_94_2001 */
++    sdb->sdb_GetDBPrivateKey = NULL;
++    /* GOST_89_94_2001 */
+ 
+     if (inTransaction) {
+ 	sqlerr = sqlite3_exec(sqlDB, COMMIT_CMD, NULL, 0, NULL);
+diff --git a/security/nss/lib/softoken/sdb.h b/security/nss/lib/softoken/sdb.h
+index e4ded72..ab2c28b 100644
+--- a/security/nss/lib/softoken/sdb.h
++++ b/security/nss/lib/softoken/sdb.h
+@@ -89,6 +89,9 @@ struct SDBStr {
+ 				SECItem *item1, SECItem *item2);
+     CK_RV (*sdb_PutMetaData)(SDB *sdb, const char *id,
+ 				const SECItem *item1, const SECItem *item2);
++    /* GOST_89_94_2001 */
++    CK_RV (*sdb_GetDBPrivateKey)(SDB *sdb, CK_OBJECT_HANDLE handle, CK_ITEM_PTR_PTR derPK);
++    /* GOST_89_94_2001 */
+     CK_RV (*sdb_Begin)(SDB *sdb);
+     CK_RV (*sdb_Commit)(SDB *sdb);
+     CK_RV (*sdb_Abort)(SDB *sdb);
+diff --git a/security/nss/lib/softoken/softoken.h b/security/nss/lib/softoken/softoken.h
+index 6375f9a..666f762 100644
+--- a/security/nss/lib/softoken/softoken.h
++++ b/security/nss/lib/softoken/softoken.h
+@@ -257,6 +257,11 @@ extern void sftk_AuditDeriveKey(CK_SESSION_HANDLE hSession,
+ extern void sftk_AuditDigestKey(CK_SESSION_HANDLE hSession,
+ 			CK_OBJECT_HANDLE hKey, CK_RV rv);
+ 
++/* GOST_89_94_2001 */
++extern void sftk_AuditGetDBPrivateKey(CK_SESSION_HANDLE hSession,
++                                      CK_OBJECT_HANDLE hObject, CK_ITEM_PTR_PTR ppDerPK, CK_RV rv);
++/* GOST_89_94_2001 */
++
+ /*
+ ** FIPS 140-2 Error state
+ */
+diff --git a/security/nss/lib/ssl/config.mk b/security/nss/lib/ssl/config.mk
+index 5bbcd33..bcc6169 100644
+--- a/security/nss/lib/ssl/config.mk
++++ b/security/nss/lib/ssl/config.mk
+@@ -107,4 +107,9 @@ ifeq ($(OS_ARCH), BeOS)
+ EXTRA_SHARED_LIBS += -lbe
+ endif
+ 
++CSRCS += propenssl.c
++OPENSSL=../../../../../openssl
++INCLUDES += -I$(OPENSSL)/include
++EXTRA_LIBS += -L$(OPENSSL) -lssl -lcrypto -lpkcs12 -lpkcs7
++
+ endif
+diff --git a/security/nss/lib/ssl/derive.c b/security/nss/lib/ssl/derive.c
+index 84d7da0..c75a6a5 100644
+--- a/security/nss/lib/ssl/derive.c
++++ b/security/nss/lib/ssl/derive.c
+@@ -646,6 +646,7 @@ SSL_CanBypass(CERTCertificate *cert, SECKEYPrivateKey *srvPrivkey,
+ 	    break;
+ 	case ssl_kea_dh:
+ 	    /* this is actually DHE */
++        /* GOST_89_94_2001 */
+ 	default:
+ 	    continue;
+ 	}
+diff --git a/security/nss/lib/ssl/propenssl.c b/security/nss/lib/ssl/propenssl.c
+new file mode 100644
+index 0000000..30aae8f
+--- /dev/null
++++ b/security/nss/lib/ssl/propenssl.c
+@@ -0,0 +1,524 @@
++/* Модуль поддержки провайдера протокола SSL openssl 
++   Copyright 2010 ЗАО "НИП Информзащита" (http://www.infosec.ru/)
++   Авторы: Александр Сапожников (NCR@infosec.ru), Андрей Гаврилин (andrey.gavrilin@trustverse.com)
++*/
++
++#include "cert.h"
++#include "ssl.h"
++#include "sslimpl.h"
++
++#include <pkcs12.h>
++#include <pk11func.h>
++#include <secitem.h>
++#include <private/pprio.h>
++
++#include <openssl/err.h>
++#include <openssl/engine.h>
++#include <openssl/ssl.h>
++#include <openssl/pkcs12.h>
++
++#include <p12.h>
++
++#if defined(WIN32)
++#define MAP_ERROR(from,to) if (err == from) { PORT_SetError(to); }
++#define DEFINE_ERROR       PRErrorCode err = PR_GetError();
++#else
++#define MAP_ERROR(from,to)
++#define DEFINE_ERROR
++#endif
++
++/* Контекст OpenSSL */
++static SSL_CTX *ctx=NULL; 
++
++/* Сохранённая информация о соединении в формате Firefox */
++static sslSocket *_ss=NULL;
++
++/* Вывод в консоль описания ошибки OpenSSL */
++static void SSL_perror(const char *where) {
++    u_long e;
++    int line, flags;
++    const char *file,*data;
++    while ((e=ERR_get_error_line_data(&file,&line,&data,&flags))) {
++	const char *ls=ERR_lib_error_string(e);
++	const char *fs=ERR_func_error_string(e);
++	const char *rs=ERR_reason_error_string(e);
++	printf("OpenSSL: %s: %s: %s: %s (%s:%d) %s", 
++	    where, ls?ls:"unknown", fs?fs:"unknown", rs?rs:"unknown", 
++	    file, line, (flags&ERR_TXT_STRING)?data:"");
++    }
++}
++
++/* Обработчик выходного потока для функции SEC_PKCS12Encode() */
++void BIO_callback(void *arg, const char *buf, unsigned long len) {
++    if (arg && buf && len>0)
++	BIO_write((BIO*)arg, buf, len);
++}
++
++/* Инициализация сертификата пользователя */
++static int ssl_get_peer_certificate(sslSocket *ss) {
++    int rv = 0;
++    if (ss) {
++        if (!ss->sec.peerCert) {
++            /* Получаем из соединения сертификат пользователя */
++            X509 *x509 = SSL_get_peer_certificate((SSL*)(ss->openssl));
++            if (x509) {
++                /* Преобразование сертификата из формата OpenSSL в формат Firefox */
++                unsigned char *pp;
++                SECItem certItem;
++                /* Получаем размер сертификата */
++                certItem.len  = i2d_X509(x509, NULL);
++                if (certItem.len > 0) {
++                    /* Выделяем память под сертификат */
++                    pp = PORT_Alloc(certItem.len);
++                    certItem.data = pp;
++                    /* Записываем сертификат в выделенную память */
++                    if (i2d_X509(x509, &pp) > 0) {
++                        /* Преобразуем сертификат в формат Firefox */
++                        /*ss->sec.peerCert = CERT_NewTempCertificate(ss->dbHandle, certItem, NULL, PR_FALSE, PR_TRUE);*/
++                        ss->sec.peerCert = SEC_PKCS12DecodeDERCertificate(&certItem, PR_TRUE, NULL);
++                        if (ss->sec.peerCert) rv = 1;
++                    }
++                    PORT_Free(pp);
++                }
++                X509_free(x509);
++            }
++        } else {
++            rv = 1;
++        }
++    }
++
++    return rv;
++}
++
++/* Обработчик запроса сертификата пользователя для OpenSSL */
++static int ssl_OpensslGetClientCertificate(
++	SSL *ssl, X509 **pcert, EVP_PKEY **pkey) {
++    int rv=-1;
++
++    SECItem* certDER = NULL;
++    SECItem* keyDER = NULL;
++       
++    *pkey=NULL;
++    *pcert=NULL;
++
++    if (!_ss || !_ss->getClientAuthDERData)
++        return -1;
++
++    /* Получаем из соединения сертификат пользователя */
++    if (!ssl_get_peer_certificate(_ss))
++        return -1;
++
++    CERTDistNames ca_list;
++    PRArenaPool * arena_ca_list = NULL;
++
++    ca_list.arena = NULL;
++    ca_list.nnames = 0;
++    ca_list.names = NULL;
++    ca_list.head = NULL;
++
++    STACK_OF(X509_NAME) *client_CA = SSL_get_client_CA_list(ssl);
++    if ((client_CA != NULL) && (sk_X509_NAME_num(client_CA) > 0)) {
++        int i, count_names = sk_X509_NAME_num(client_CA);
++
++        ca_list.arena = arena_ca_list = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
++        if (arena_ca_list) {
++            ca_list.nnames = count_names;
++            ca_list.names = PORT_ArenaNewArray(arena_ca_list, SECItem, count_names);
++
++            int success = 1;
++
++            for (i = 0; i < count_names; i++) {
++                X509_NAME *xn = sk_X509_NAME_value(client_CA, i);
++
++                int j, count_entries = sk_X509_NAME_ENTRY_num(xn->entries);
++
++                CERTName name;
++                PRArenaPool *arena_name = name.arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
++                if (!arena_name) {
++                    success = 0;
++                    break;
++                }
++
++                CERTRDN **rdns = (CERTRDN**)PORT_ArenaZAlloc(arena_name, sizeof(CERTRDN*) * (count_entries + 1));
++                if (!rdns) {
++                    success = 0;
++                    break;
++                }
++
++                name.rdns = rdns;
++
++                for (j = 0; j < count_entries; j++) {
++                    X509_NAME_ENTRY *xne=sk_X509_NAME_ENTRY_value(xn->entries, j);
++
++                    CERTRDN *rdn = (CERTRDN*)PORT_ArenaZAlloc(arena_name, sizeof(CERTRDN));
++                    if (!rdn) {
++                        success = 0;
++                        break;
++                    }
++                    *rdns = rdn;
++
++                    CERTAVA **avas = (CERTAVA**)PORT_ArenaZAlloc(arena_name, sizeof(CERTAVA*) << 1);
++                    if (!avas) {
++                        success = 0;
++                        break;
++                    }
++                    rdn->avas = avas;
++
++                    CERTAVA *ava = (CERTAVA*)PORT_ArenaZAlloc(arena_name, sizeof(CERTAVA));
++                    if (!ava) {
++                        success = 0;
++                        break;
++                    }
++                    *avas = ava;
++
++                    ava->type.data = PORT_ArenaZAlloc(arena_name, sizeof(char) * xne->object->length);
++                    if (!ava->type.data) {
++                        success = 0;
++                        break;
++                    }
++                    PORT_Memcpy(ava->type.data, xne->object->data, xne->object->length);
++                    ava->type.type = siBuffer;
++                    ava->type.len = xne->object->length;
++
++                    ava->value.data = PORT_ArenaZAlloc(arena_name, sizeof(char) * xne->value->length + 2);
++                    if (!ava->value.data) {
++                        success = 0;
++                        break;
++                    }
++                    PORT_Memcpy(ava->value.data + 2, xne->value->data, xne->value->length);
++                    ava->value.data[0] = (char)xne->value->type;
++                    ava->value.data[1] = (char)xne->value->length;
++                    ava->value.type = siBuffer;
++                    ava->value.len = xne->value->length + 2;
++
++                    ++avas;
++                    *avas = 0;
++
++                    ++rdns;
++                }
++
++                if (success) {
++                    *rdns = 0;
++
++                    SECItem *derName = SEC_ASN1EncodeItem(arena_ca_list, NULL, &name, CERT_NameTemplate);
++
++                    if (derName) {
++                        ca_list.names[i].data = derName->data;
++                        ca_list.names[i].len = derName->len;
++
++                        PORT_Free(derName);
++                    } else {
++                        success = 0;
++                    }
++                }
++
++                if (arena_name != NULL)
++                    PORT_FreeArena(arena_name, PR_FALSE);
++
++                if (!success) {
++                    ca_list.nnames = 0;
++                    break;
++                }
++            }
++        }
++    }
++
++    /* Выбираем клиентский сертификат из хранилища */
++    int res = 1;
++    if (ca_list.nnames) {
++        res = (*_ss->getClientAuthDERData)(_ss->getClientAuthDERDataArg, _ss->fd,  &ca_list, &certDER, &keyDER);
++    }
++
++    if (arena_ca_list != NULL)
++        PORT_FreeArena(arena_ca_list, PR_FALSE);
++
++    if (res) {
++        /* Сертификат не найден */
++        return 0;
++    }
++
++    if (certDER && keyDER) {
++        *pcert = d2i_X509(NULL, (const unsigned char **)&certDER->data, certDER->len);
++
++        if (*pcert) {
++            int type = OBJ_obj2nid((*pcert)->cert_info->key->algor->algorithm);
++
++            *pkey = d2i_PrivateKey(type, NULL, (const unsigned char **)&keyDER->data, keyDER->len);
++        }
++
++        if (*pcert && *pkey) {
++             rv = 1;
++        }        
++    }
++
++    if (certDER)
++        SECITEM_ZfreeItem(certDER, PR_TRUE);
++    if (keyDER)
++        SECITEM_ZfreeItem(keyDER, PR_TRUE);
++
++    return rv;
++}
++
++/* Выполнение установление защищенного канала SSL (handshake) */
++static int ssl_OpensslHandshake(sslSocket *ss) {
++    int rv;
++
++    _ss=ss;
++    /* OpenSSL уже инициализирован? */
++    if (!ctx) {
++	ENGINE *e;
++	
++	/* Регистрация engine "gost" OpenSSL */
++	SSLeay_add_all_algorithms();
++	ERR_load_crypto_strings();
++	SSL_load_error_strings();
++            
++	ENGINE_load_gost();
++	e=ENGINE_by_id("gost");
++	if (!e || !ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
++        	ENGINE_free(e);
++		PORT_SetError(PR_LOAD_LIBRARY_ERROR);
++		return PR_FAILURE;
++	}
++	ENGINE_free(e);
++	SSL_library_init();
++
++	/* Создаем контекст OpenSSL для методов TLS v1 */                    	                    
++	ctx=SSL_CTX_new(TLSv1_client_method());
++	if (!ctx) {
++	    SSL_perror("SSL_CTX_new");
++	    PORT_SetError(PR_OUT_OF_MEMORY_ERROR);
++	    return PR_FAILURE;
++	}
++	
++	/* Регистрируем обработчик запроса сертификата пользователя */
++        SSL_CTX_set_client_cert_cb(ctx, &ssl_OpensslGetClientCertificate);
++    }
++    
++    /* Информация о SSL соединении OpenSSL уже создана? */
++    if (!(ss->openssl)) {
++	/* Получаем из информации о соединении Firefox дескриптор сокета */
++	int fd=PR_FileDesc2NativeHandle(ss->fd->lower);
++	ss->firstHsDone=0;
++	/* Создаем информвцию о SSL соединении OpenSSL */
++	ss->openssl=SSL_new(ctx);
++	if (!(ss->openssl)) {
++	    SSL_perror("SSL_new");
++	    PORT_SetError(PR_OUT_OF_MEMORY_ERROR);
++	    return PR_FAILURE;
++	}
++
++	/* Связываем информацию о SSL соединении OpenSSL с открытым сокетом */
++	SSL_set_fd((SSL*)(ss->openssl), fd);
++    }
++
++    /* Защищенный канал SSL уже установлен? */
++    if (!ss->firstHsDone) {
++	/* Установление защищенного канала SSL */
++	rv=SSL_connect((SSL*)(ss->openssl));
++        if (rv != 1) {
++	    /*printf("SSL_connect()=%d, errno=%d, SSL_get_error()=%d\n", rv, errno, SSL_get_error((SSL*)(ss->openssl), rv));*/
++	    SSL_perror("SSL_connect");
++	    if (errno==EAGAIN)
++		PORT_SetError(PR_WOULD_BLOCK_ERROR);
++	    else 
++		PORT_SetError(PR_NOT_CONNECTED_ERROR);
++	    return PR_FAILURE;
++	}
++    }
++    
++    /* Получаем из соединения сертификат пользователя */
++    if (ssl_get_peer_certificate(ss)) {
++        ss->firstHsDone=1;
++
++        /* Получаем информацию о параметрах защищенного канала OpenSSL */
++        const SSL_CIPHER *cipher=SSL_get_current_cipher((SSL*)(ss->openssl));
++        if (cipher) {
++            /* Устанавливаем размер ключа шифрования */
++            ss->sec.secretKeyBits=cipher->alg_bits;
++            ss->sec.keyBits=cipher->alg_bits;
++        } else {
++            /* Размер ключа шифрования не известен */
++            ss->sec.secretKeyBits=64;
++            ss->sec.keyBits=64;
++        }
++	
++	/* Запускаем обработчик информирования об установлении
++	   защищенного канала SSL Firefox. Он обновит информацию о соединении */
++	if (ss->handshakeCallback)
++		(ss->handshakeCallback)(ss->fd, ss->handshakeCallbackData);
++
++	/* Запускаем обработчик сертификата сервера */    		
++	if (ss->authCertificate) {
++            if ((*ss->authCertificate)(ss->authCertificateArg, ss->fd, PR_FALSE, PR_FALSE)) {
++                /* Сертификат не прошел проверку */
++                if (ss->handleBadCert)
++                    (*ss->handleBadCert)(ss->badCertArg, ss->fd);
++                return PR_FAILURE;
++            }
++        }
++    }
++    return PR_SUCCESS;
++}
++
++
++/* Обработчик запроса на устанавливление TCP соединения с WEB сервером */
++static int ssl_OpensslConnect(sslSocket *ss, const PRNetAddr *sa) {
++    int rv;
++    
++    ss->firstHsDone=0;
++
++    /* Запускаем обработчик по умолчанию Firefox */
++    rv=ssl_DefConnect(ss, sa);
++    if (rv==PR_SUCCESS)
++	    ss->TCPconnected = 1;
++    /* Сокет в не блокируемом режиме */
++    return rv;
++}
++
++/* Обработчик закрытия защищенного канала */
++static int ssl_OpensslShutdown(sslSocket *ss, int how) {
++    /* Завершаем SSL соединение OpenSSL */
++    if (ss->openssl)
++	SSL_shutdown((SSL*)(ss->openssl));
++
++    ss->shutdownHow |= how;
++
++    /* Запускаем обработчик по умолчанию Firefox */
++    return ssl_DefShutdown(ss, how);
++}
++
++/* Обработчик получения данных из защищенного канала */
++static int ssl_OpensslRecv(sslSocket *ss, 
++	unsigned char *buf, int len, int flags) {
++    int rv;
++
++    /* Данные шифрованные? */
++    if (!ss->opt.useSecurity)
++	/* Не шифрованные: запускаем обработчик по умолчанию Firefox */ 
++    	return ssl_DefRecv(ss, buf, len, flags);
++
++    /* Защищенный канал установлен? */    	
++    if (!(ss->firstHsDone)) {
++	ssl_GetSSL3HandshakeLock(ss);
++	/* Запускаем установку защищенного канала */
++	rv=ssl_OpensslHandshake(ss);	
++	ssl_ReleaseSSL3HandshakeLock(ss);
++	if (rv!=PR_SUCCESS)
++	    return rv;
++	if (!(ss->firstHsDone) || !(ss->openssl)) {
++	    PORT_SetError(PR_NOT_CONNECTED_ERROR);
++	    return PR_FAILURE;
++	}
++    }
++
++    ssl_GetSSL3HandshakeLock(ss);
++    /* Читаем данные из защищенного канала */
++    rv=SSL_read((SSL*)(ss->openssl), buf, len);
++    ssl_ReleaseSSL3HandshakeLock(ss);
++    /*if (rv>0) dump("SSL_read", buf, rv);*/
++    if (rv < 0) {
++	/*printf("SSL_read()=%d vs %d errno=%d\n", rv, len, errno);*/
++	SSL_perror("SSL_read");
++	if (errno==EAGAIN)
++	    PORT_SetError(PR_WOULD_BLOCK_ERROR);
++	else 
++	    PORT_SetError(PR_CONNECT_RESET_ERROR);
++	rv = PR_FAILURE;
++    } else if (rv > len) {
++	PORT_Assert(rv <= len);
++	PORT_SetError(PR_BUFFER_OVERFLOW_ERROR);
++	rv = SECFailure;
++    }
++    return rv;
++}
++
++/* Обработчик передачи данных через защищенный канал */
++static int ssl_OpensslSend(sslSocket *ss, 
++	const unsigned char *buf, int len, int flags) {
++    int rv;
++    int sent = 0;
++
++    /* Данные шифрованные? */
++    if (!ss->opt.useSecurity) 
++	/* Не шифрованные: запускаем обработчик по умолчанию Firefox */ 
++    	return ssl_DefSend(ss, buf, len, flags);
++    	
++    /* Защищенный канал установлен? */
++    if (!(ss->firstHsDone)) {
++	ssl_GetSSL3HandshakeLock(ss);
++	/* Запускаем установку защищенного канала */
++        rv=ssl_OpensslHandshake(ss);
++	ssl_ReleaseSSL3HandshakeLock(ss);
++	if (rv!=PR_SUCCESS)
++	    return rv;
++    }
++    
++    do {
++	if (!(ss->firstHsDone) || !(ss->openssl)) {
++	    PORT_SetError(PR_NOT_CONNECTED_ERROR);
++	    return PR_FAILURE;
++	}
++	ssl_GetSSL3HandshakeLock(ss);
++	/* Отправка данных через защищенный канал */
++	rv=SSL_write((SSL*)(ss->openssl), buf, len);
++	ssl_ReleaseSSL3HandshakeLock(ss);
++	if (rv < 0) {
++	    /*printf("SSL_write()=%d vs %d errno=%d\n", rv, len, errno);*/
++	    SSL_perror("SSL_write");
++	    if (errno==EAGAIN) {
++		ss->lastWriteBlocked = 1;
++		return sent ? sent : SECFailure;
++	    }
++	    ss->lastWriteBlocked = 0;
++	    PORT_SetError(PR_CONNECT_RESET_ERROR);
++    	    return PR_FAILURE;
++	}
++	sent += rv;
++    } while (len > sent);
++    ss->lastWriteBlocked = 0;
++    return sent;
++}
++
++/* Обработчик чтения из защищенного канала */
++static int ssl_OpensslRead(sslSocket *ss, unsigned char *buf, int len) {
++    /* Запускаем получение данных из защищенного канала */
++    return ssl_OpensslRecv(ss, buf, len, 0);
++}
++
++/* Обработчик записи в защищенный канал */
++static int ssl_OpensslWrite(sslSocket *ss, const unsigned char *buf, int len) {
++    /* Запускаем передачу данных в защищенный канал */
++    return ssl_OpensslSend(ss, buf, len, 0);
++}
++
++/* Обработчик закрытия TCP соединения с WEB сервером */
++static int ssl_OpensslClose(sslSocket *ss) {
++    ss->firstHsDone=0;
++    if (ss->openssl) {
++	ssl_GetSSL3HandshakeLock(ss);
++	/* Освобождаем информацию о SSL соединении OpenSSL */
++	SSL_free((SSL*)(ss->openssl));
++	ss->openssl=NULL;
++	ssl_ReleaseSSL3HandshakeLock(ss);
++    }
++
++    /* Запускаем обработчик по умолчанию Firefox */
++    return ssl_DefClose(ss);
++}
++
++/* Структура обработчиков вызовов провадера SSL протокола Firefox */
++const sslSocketOps ssl_openssl_ops = {
++    ssl_OpensslConnect,
++    NULL/*ssl_OpensslAccept*/,
++    ssl_DefBind,
++    ssl_DefListen,
++    ssl_OpensslShutdown,
++    ssl_OpensslClose,
++    ssl_OpensslRecv,
++    ssl_OpensslSend,
++    ssl_OpensslRead,
++    ssl_OpensslWrite,
++    ssl_DefGetpeername,
++    ssl_DefGetsockname
++};
+diff --git a/security/nss/lib/ssl/ssl.def b/security/nss/lib/ssl/ssl.def
+index e4d4d1d..3bdf922 100644
+--- a/security/nss/lib/ssl/ssl.def
++++ b/security/nss/lib/ssl/ssl.def
+@@ -77,6 +77,9 @@ SSL_ConfigServerSessionIDCache;
+ SSL_DataPending;
+ SSL_ForceHandshake;
+ SSL_GetClientAuthDataHook;
++;+# GOST_89_94_2001
++SSL_GetClientAuthDERDataHook;
++;+# GOST_89_94_2001
+ SSL_GetSessionID;
+ SSL_GetStatistics;
+ SSL_HandshakeCallback;
+diff --git a/security/nss/lib/ssl/ssl.h b/security/nss/lib/ssl/ssl.h
+index 3026b48..b6b447b 100644
+--- a/security/nss/lib/ssl/ssl.h
++++ b/security/nss/lib/ssl/ssl.h
+@@ -241,6 +241,21 @@ typedef SECStatus (PR_CALLBACK *SSLGetClientAuthData)(void *arg,
+                                 CERTCertificate **pRetCert,/*return */
+                                 SECKEYPrivateKey **pRetKey);/* return */
+ 
++/* GOST_89_94_2001 */
++/*
++ * Prototype for SSL callback to get client auth data from the application.
++ *	arg - application passed argument
++ *	caNames - pointer to distinguished names of CAs that the server likes
++ *	pRetDERCert - pointer to pointer to cert, for return of cert
++ *	pRetDERKey - pointer to key pointer, for return of key
++ */
++typedef SECStatus (PR_CALLBACK *SSLGetClientAuthDERData)(void *arg,
++                                PRFileDesc *fd,
++                                CERTDistNames *caNames,
++                                SECItem **pRetDERCert,/*return */
++                                SECItem **pRetDERKey);/* return */
++/* GOST_89_94_2001 */
++
+ /*
+  * Set the client side callback for SSL to retrieve user's private key
+  * and certificate.
+@@ -248,9 +263,20 @@ typedef SECStatus (PR_CALLBACK *SSLGetClientAuthData)(void *arg,
+  *	f - the application's callback that delivers the key and cert
+  *	a - application specific data
+  */
+-SSL_IMPORT SECStatus SSL_GetClientAuthDataHook(PRFileDesc *fd, 
+-			                       SSLGetClientAuthData f, void *a);
++SSL_IMPORT SECStatus SSL_GetClientAuthDataHook(PRFileDesc *fd,
++                                               SSLGetClientAuthData f, void *a);
+ 
++/* GOST_89_94_2001 */
++/*
++ * Set the client side callback for SSL to retrieve user's private key
++ * and certificate.
++ *	fd - the file descriptor for the connection in question
++ *	f - the application's callback that delivers the key and cert
++ *	a - application specific data
++ */
++SSL_IMPORT SECStatus SSL_GetClientAuthDERDataHook(PRFileDesc *fd,
++                                                  SSLGetClientAuthDERData f, void *a);
++/* GOST_89_94_2001 */
+ 
+ /*
+  * Set the client side argument for SSL to retrieve PKCS #11 pin.
+diff --git a/security/nss/lib/ssl/ssl3con.c b/security/nss/lib/ssl/ssl3con.c
+index 7f332e9..21188bd 100644
+--- a/security/nss/lib/ssl/ssl3con.c
++++ b/security/nss/lib/ssl/ssl3con.c
+@@ -654,6 +654,7 @@ ssl3_config_match_init(sslSocket *ss)
+ 		 * simultaneously. For now, both of them use
+ 		 * whatever is in the certificate slot for kt_ecdh
+ 		 */
++            /* GOST_89_94_2001 */
+ 	    default:
+ 		svrAuth = ss->serverCerts + exchKeyType;
+ 		break;
+@@ -842,6 +843,8 @@ ssl3_SignHashes(SSL3Hashes *hash, SECKEYPrivateKey *key, SECItem *buf,
+ 	hashItem.len = sizeof(hash->sha);
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+ 	PORT_SetError(SEC_ERROR_INVALID_KEY);
+ 	goto done;
+@@ -940,6 +943,8 @@ ssl3_VerifySignedHashes(SSL3Hashes *hash, CERTCertificate *cert,
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
++    /*case gostKey:*/
+     default:
+     	SECKEY_DestroyPublicKey(key);
+ 	PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+@@ -3930,6 +3935,7 @@ ssl_UnwrapSymWrappingKey(
+         break;
+ #endif
+ 
++    /* GOST_89_94_2001 */
+     default:
+ 	/* Assert? */
+ 	SET_ERROR_CODE
+@@ -4193,6 +4199,7 @@ ec_cleanup:
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
+     default:
+ 	rv = SECFailure;
+ 	break;
+@@ -4478,6 +4485,7 @@ ssl3_SendClientKeyExchange(sslSocket *ss)
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
+     default:
+ 	/* got an unknown or unsupported Key Exchange Algorithm.  */
+ 	SEND_ALERT
+@@ -5069,6 +5077,7 @@ ssl3_HandleServerKeyExchange(sslSocket *ss, SSL3Opaque *b, PRUint32 length)
+ 	return rv;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
+     default:
+     	desc    = handshake_failure;
+ 	errCode = SEC_ERROR_UNSUPPORTED_KEYALG;
+@@ -6417,6 +6426,7 @@ const ssl3KEADef *     kea_def     = ss->ssl3.hs.kea_def;
+ 
+     case kt_dh:
+     case kt_null:
++    /* GOST_89_94_2001 */
+     default:
+ 	PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+ 	break;
+@@ -6881,6 +6891,7 @@ skip:
+ 	break;
+ #endif /* NSS_ENABLE_ECC */
+ 
++    /* GOST_89_94_2001 */
+     default:
+ 	(void) ssl3_HandshakeFailure(ss);
+ 	PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+diff --git a/security/nss/lib/ssl/sslauth.c b/security/nss/lib/ssl/sslauth.c
+index 742765c..23225c8 100644
+--- a/security/nss/lib/ssl/sslauth.c
++++ b/security/nss/lib/ssl/sslauth.c
+@@ -193,7 +193,7 @@ SSL_AuthCertificateHook(PRFileDesc *s, SSLAuthCertificate func, void *arg)
+ /* NEED LOCKS IN HERE.  */
+ SECStatus 
+ SSL_GetClientAuthDataHook(PRFileDesc *s, SSLGetClientAuthData func,
+-			      void *arg)
++                              void *arg)
+ {
+     sslSocket *ss;
+ 
+@@ -209,6 +209,26 @@ SSL_GetClientAuthDataHook(PRFileDesc *s, SSLGetClientAuthData func,
+     return SECSuccess;
+ }
+ 
++/* GOST_89_94_2001 */
++SECStatus
++SSL_GetClientAuthDERDataHook(PRFileDesc *s, SSLGetClientAuthDERData func,
++                              void *arg)
++{
++    sslSocket *ss;
++
++    ss = ssl_FindSocket(s);
++    if (!ss) {
++        SSL_DBG(("%d: SSL[%d]: bad socket in GetClientAuthDERDataHook",
++                 SSL_GETPID(), s));
++        return SECFailure;
++    }
++
++    ss->getClientAuthDERData = func;
++    ss->getClientAuthDERDataArg = arg;
++    return SECSuccess;
++}
++/* GOST_89_94_2001 */
++
+ /* NEED LOCKS IN HERE.  */
+ SECStatus 
+ SSL_SetPKCS11PinArg(PRFileDesc *s, void *arg)
+diff --git a/security/nss/lib/ssl/sslimpl.h b/security/nss/lib/ssl/sslimpl.h
+index cae46a9..385716d 100644
+--- a/security/nss/lib/ssl/sslimpl.h
++++ b/security/nss/lib/ssl/sslimpl.h
+@@ -1017,6 +1017,10 @@ const unsigned char *  preferredCipher;
+     void                     *authCertificateArg;
+     SSLGetClientAuthData      getClientAuthData;
+     void                     *getClientAuthDataArg;
++    /* GOST_89_94_2001 */
++    SSLGetClientAuthDERData   getClientAuthDERData;
++    void                     *getClientAuthDERDataArg;
++    /* GOST_89_94_2001 */
+     SSLBadCertHandler         handleBadCert;
+     void                     *badCertArg;
+     SSLHandshakeCallback      handshakeCallback;
+@@ -1086,6 +1090,8 @@ const unsigned char *  preferredCipher;
+     /* True when the current session is a stateless resume. */
+     PRBool               statelessResume;
+     TLSExtensionData     xtnData;
++    
++    void *openssl;
+ };
+ 
+ 
+diff --git a/security/nss/lib/ssl/sslproto.h b/security/nss/lib/ssl/sslproto.h
+index b0b466f..7a3af9e 100644
+--- a/security/nss/lib/ssl/sslproto.h
++++ b/security/nss/lib/ssl/sslproto.h
+@@ -219,4 +219,6 @@
+ #define SSL_RSA_FIPS_WITH_3DES_EDE_CBC_SHA 	0xfeff
+ #define SSL_RSA_FIPS_WITH_DES_CBC_SHA      	0xfefe
+ 
++/* GOST_89_94_2001 */
++
+ #endif /* __sslproto_h_ */
+diff --git a/security/nss/lib/ssl/sslsock.c b/security/nss/lib/ssl/sslsock.c
+index 39e0f57..f0a4a69 100644
+--- a/security/nss/lib/ssl/sslsock.c
++++ b/security/nss/lib/ssl/sslsock.c
+@@ -129,6 +129,8 @@ static cipherPolicy ssl_ciphers[] = {	   /*   Export           France   */
+  {  0,					    SSL_NOT_ALLOWED, SSL_NOT_ALLOWED }
+ };
+ 
++const sslSocketOps ssl_openssl_ops;	/* Openssl SSL. */
++
+ static const sslSocketOps ssl_default_ops = {	/* No SSL. */
+     ssl_DefConnect,
+     NULL,
+@@ -330,6 +332,10 @@ ssl_DupSocket(sslSocket *os)
+ 	    ss->authCertificateArg    = os->authCertificateArg;
+ 	    ss->getClientAuthData     = os->getClientAuthData;
+ 	    ss->getClientAuthDataArg  = os->getClientAuthDataArg;
++            /* GOST_89_94_2001 */
++            ss->getClientAuthDERData     = os->getClientAuthDERData;
++            ss->getClientAuthDERDataArg  = os->getClientAuthDERDataArg;
++            /* GOST_89_94_2001 */
+ 	    ss->handleBadCert         = os->handleBadCert;
+ 	    ss->badCertArg            = os->badCertArg;
+ 	    ss->handshakeCallback     = os->handshakeCallback;
+@@ -504,7 +510,7 @@ ssl_EnableNagleDelay(sslSocket *ss, PRBool enabled)
+ static void
+ ssl_ChooseOps(sslSocket *ss)
+ {
+-    ss->ops = ss->opt.useSecurity ? &ssl_secure_ops : &ssl_default_ops;
++    ss->ops = ss->opt.useSecurity ? &ssl_openssl_ops/*ssl_secure_ops*/ : &ssl_default_ops;
+ }
+ 
+ /* Called from SSL_Enable (immediately below) */
+@@ -2155,6 +2161,7 @@ ssl_NewSocket(PRBool makeLocks)
+         ss->sizeCipherSpecs    = 0;  /* produced lazily */
+         ss->preferredCipher    = NULL;
+         ss->url                = NULL;
++	ss->openssl	       = NULL;
+ 
+ 	for (i=kt_null; i < kt_kea_size; i++) {
+ 	    sslServerCerts * sc = ss->serverCerts + i;
+@@ -2170,6 +2177,9 @@ ssl_NewSocket(PRBool makeLocks)
+ 	ss->authCertificate    = SSL_AuthCertificate;
+ 	ss->authCertificateArg = (void *)ss->dbHandle;
+ 	ss->getClientAuthData  = NULL;
++        /* GOST_89_94_2001 */
++        ss->getClientAuthDERData  = NULL;
++        /* GOST_89_94_2001 */
+ 	ss->handleBadCert      = NULL;
+ 	ss->badCertArg         = NULL;
+ 	ss->pkcs11PinArg       = NULL;
+diff --git a/security/nss/lib/util/pkcs11f.h b/security/nss/lib/util/pkcs11f.h
+index a6bc91f..63b4428 100644
+--- a/security/nss/lib/util/pkcs11f.h
++++ b/security/nss/lib/util/pkcs11f.h
+@@ -935,3 +935,16 @@ CK_PKCS11_FUNCTION_INFO(C_WaitForSlotEvent)
+   CK_VOID_PTR pRserved   /* reserved.  Should be NULL_PTR */
+ );
+ #endif
++
++
++/* GOST_89_94_2001 */
++/* C_GetDBPrivateKey obtains the private key in DER format. */
++CK_PKCS11_FUNCTION_INFO(C_GetDBPrivateKey)
++#ifdef CK_NEED_ARG_LIST
++(
++  CK_SESSION_HANDLE hSession,   /* the session's handle */
++  CK_OBJECT_HANDLE  hObject,    /* the object's handle */
++  CK_ITEM_PTR_PTR   ppDerPK     /* the private key */
++);
++#endif
++/* GOST_89_94_2001 */
+diff --git a/security/nss/lib/util/pkcs11t.h b/security/nss/lib/util/pkcs11t.h
+index 044ec51..fcf27b9 100644
+--- a/security/nss/lib/util/pkcs11t.h
++++ b/security/nss/lib/util/pkcs11t.h
+@@ -147,6 +147,17 @@ typedef CK_ULONG          CK_SLOT_ID;
+ 
+ typedef CK_SLOT_ID CK_PTR CK_SLOT_ID_PTR;
+ 
++/* GOST_89_94_2001 */
++typedef struct CK_ITEM {
++  CK_ULONG type;
++  CK_CHAR_PTR data;
++  CK_ULONG len;
++} CK_ITEM;
++
++typedef CK_ITEM CK_PTR CK_ITEM_PTR;
++typedef CK_ITEM_PTR CK_PTR CK_ITEM_PTR_PTR;
++/* GOST_89_94_2001 */
++
+ 
+ /* CK_SLOT_INFO provides information about a slot */
+ typedef struct CK_SLOT_INFO {
+@@ -433,6 +444,9 @@ typedef CK_ULONG          CK_KEY_TYPE;
+ 
+ #define CKK_VENDOR_DEFINED  0x80000000
+ 
++/* GOST_89_94_2001 */
++#define CKK_GOST            CKK_VENDOR_DEFINED + 0x01000001
++
+ 
+ /* CK_CERTIFICATE_TYPE is a value that identifies a certificate
+  * type */
+@@ -587,6 +601,10 @@ typedef CK_ULONG          CK_ATTRIBUTE_TYPE;
+ 
+ #define CKA_VENDOR_DEFINED     0x80000000
+ 
++/* GOST_89_94_2001 */
++#define CKA_GOST_PARAMSET2001           CKA_VENDOR_DEFINED + 0x01000001
++#define CKA_GOST_PARAMSET94             CKA_VENDOR_DEFINED + 0x01000002
++
+ 
+ /* CK_ATTRIBUTE is a structure that includes the type, length
+  * and value of an attribute */
+@@ -958,6 +976,11 @@ typedef CK_ULONG          CK_MECHANISM_TYPE;
+ 
+ #define CKM_VENDOR_DEFINED             0x80000000
+ 
++/* GOST_89_94_2001 */
++#define CKM_GOST_KEY_PAIR_GEN                    CKM_VENDOR_DEFINED + 0x01000001
++#define CKM_GOSTR3410_2001                       CKM_VENDOR_DEFINED + 0x01000002
++#define CKM_GOSTR3411_94_WITH_GOSTR3410_2001     CKM_VENDOR_DEFINED + 0x01000003
++
+ typedef CK_MECHANISM_TYPE CK_PTR CK_MECHANISM_TYPE_PTR;
+ 
+ 
+diff --git a/security/nss/lib/util/seccomon.h b/security/nss/lib/util/seccomon.h
+index ebcae64..68ae5d9 100644
+--- a/security/nss/lib/util/seccomon.h
++++ b/security/nss/lib/util/seccomon.h
+@@ -47,6 +47,14 @@
+ #ifndef _SECCOMMON_H_
+ #define _SECCOMMON_H_
+ 
++#define HMAC_Init	HMAC_init
++#define HMAC_Update	HMAC_update
++#define MD5_Update	MD5_update
++#define SHA1_Update	SHA1_update
++#define SHA256_Update	SHA256_update
++#define SHA512_Update	SHA512_update
++#define SHA384_Update	SHA384_update
++
+ #include "utilrename.h"
+ #include "prtypes.h"
+ 
+diff --git a/security/nss/lib/util/secoid.c b/security/nss/lib/util/secoid.c
+index 7e8c1b6..4f2b154 100644
+--- a/security/nss/lib/util/secoid.c
++++ b/security/nss/lib/util/secoid.c
+@@ -590,6 +590,10 @@ CONST_OID seed_CBC[]				= { SEED_OID, 4 };
+ #define FAKE_SUPPORTED_CERT_EXTENSION UNSUPPORTED_CERT_EXTENSION
+ #endif
+ 
++/* GOST_89_94_2001 */
++CONST_OID GostR3410_2001[] = { 0x2A,0x85,0x03,0x02,0x02,0x13 };
++CONST_OID GostR3411_94_With_GostR3410_2001[] = { 0x2A,0x85,0x03,0x02,0x02,0x03 };
++
+ /*
+  * NOTE: the order of these entries must mach the SECOidTag enum in secoidt.h!
+  */
+@@ -1591,6 +1595,14 @@ const static SECOidData oids[SEC_OID_TOTAL] = {
+     OD( x509CertificatePoliciesAnyPolicy, SEC_OID_X509_ANY_POLICY,
+  	"Certificate Policies AnyPolicy",
+         CKM_INVALID_MECHANISM, UNSUPPORTED_CERT_EXTENSION ),
++
++    /* GOST_89_94_2001 */
++    /* INVALID_CERT_EXTENSION - it doesn't have supported & unsupported critical extensions ? */
++    OD( GostR3410_2001, SEC_OID_PKCS7_GOSTR3410_2001,
++        "GOST R 34.10-2001", CKM_GOSTR3410_2001, INVALID_CERT_EXTENSION ),
++
++    OD( GostR3411_94_With_GostR3410_2001, SEC_OID_PKCS7_GOSTR3411_94_WITH_GOSTR3410_2001,
++        "GOST R 34.11-94 with GOST R 34.10-2001", CKM_GOSTR3411_94_WITH_GOSTR3410_2001, INVALID_CERT_EXTENSION )
+ };
+ 
+ /* PRIVATE EXTENDED SECOID Table
+diff --git a/security/nss/lib/util/secoidt.h b/security/nss/lib/util/secoidt.h
+index 2858218..c912cbf 100644
+--- a/security/nss/lib/util/secoidt.h
++++ b/security/nss/lib/util/secoidt.h
+@@ -450,6 +450,10 @@ typedef enum {
+ 
+     SEC_OID_X509_ANY_POLICY                 = 303,
+ 
++    /* GOST_89_94_2001 */
++    SEC_OID_PKCS7_GOSTR3410_2001                   = 304,
++    SEC_OID_PKCS7_GOSTR3411_94_WITH_GOSTR3410_2001 = 305,
++
+     SEC_OID_TOTAL
+ } SECOidTag;
+ 
+diff --git a/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.c b/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.c
+index 0279a80..83898bd 100644
+--- a/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.c
++++ b/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.c
+@@ -554,6 +554,7 @@ GeneratePKParams(CK_MECHANISM_TYPE mech)
+ 
+ 	case CKM_DH_PKCS_KEY_PAIR_GEN:
+ 	case CKM_KEA_KEY_PAIR_GEN:
++        /* GOST_89_94_2001 */
+ 	default:
+ 		return NULL;
+ 	}
+@@ -577,6 +578,7 @@ FreePKParams(void* p, CK_MECHANISM_TYPE mech)
+ 	case CKM_DSA_KEY_PAIR_GEN:
+ 		PR_Free( (PQGParams*)p);
+ 		break;
++        /* GOST_89_94_2001 */
+ 	}
+ }
+ 
+@@ -1202,6 +1204,8 @@ TestSign(CK_MECHANISM_TYPE mech)
+ 		case rsaKey:
+ 			pubValue = SECITEM_DupItem(&pubk->u.rsa.modulus);
+ 			break;
++                /* GOST_89_94_2001 */
++                /*case gostKey:*/
+ 		default:
+ 			pubValue = NULL;
+ 		}
+diff --git a/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.h b/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.h
+index 87b026d..1e7774a 100755
+--- a/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.h
++++ b/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pk11test.h
+@@ -106,7 +106,8 @@ CK_MECHANISM_TYPE mechanism[] = {
+ 	CKM_JUNIPER_ECB128,
+ 	CKM_JUNIPER_CBC128,
+ 	CKM_JUNIPER_COUNTER,
+-	CKM_JUNIPER_SHUFFLE
++        CKM_JUNIPER_SHUFFLE,
++        /* GOST_89_94_2001 */
+ };
+ 
+ 
+diff --git a/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pkcs11.h b/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pkcs11.h
+index 68e0d2f..efeadf8 100644
+--- a/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pkcs11.h
++++ b/security/nss/tests/pkcs11/netscape/suites/security/pkcs11/pkcs11.h
+@@ -49,7 +49,9 @@ typedef struct {
+ 	CK_MECHANISM_TYPE	keygenMech;
+ } MechInfo;
+ 
+-static int numMechs=118;
++/* GOST_89_94_2001 */
++/*static int numMechs=118;*/
++static int numMechs=120;
+ static MechInfo mechInfo[] = {
+ 	{CKM_RSA_PKCS_KEY_PAIR_GEN,
+ 				KEYGEN_OP,	CKM_RSA_PKCS_KEY_PAIR_GEN},
+@@ -187,7 +189,11 @@ static MechInfo mechInfo[] = {
+ 	{CKM_JUNIPER_CBC128,	ENCRYPT_OP,	CKM_JUNIPER_KEY_GEN},
+ 	{CKM_JUNIPER_COUNTER,	ENCRYPT_OP,	CKM_JUNIPER_KEY_GEN},
+ 	{CKM_JUNIPER_SHUFFLE,	ENCRYPT_OP,	CKM_JUNIPER_KEY_GEN},
+-	{CKM_FASTHASH,		DIGEST_OP,	0}
++        {CKM_FASTHASH,		DIGEST_OP,	0},
++        /* GOST_89_94_2001 */
++        /* it uses for tests (in pk11test.c) */
++        {CKM_GOSTR3410_2001,    SIGN_OP,    CKM_GOST_KEY_PAIR_GEN},
++        {CKM_GOSTR3411_94_WITH_GOSTR3410_2001,  SIGN_OP,    CKM_GOST_KEY_PAIR_GEN}
+ };
+ 
+ #endif
